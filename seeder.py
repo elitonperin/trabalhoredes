@@ -8,6 +8,10 @@ class Seeder():
                  port=7001,
                  sharead_path='.',
                  args=None):
+        self.max_data_legth = 1280
+        self.ext_files = ['mp3']
+        self.APP_KEY = 'APP_KEY'
+        
         if args.port is not None:
             self.port=args.port
         else:
@@ -38,6 +42,10 @@ class Seeder():
         arquivos = [arq.split('\\')[-1] for arq in caminhos if os.path.isfile(arq)]
         return arquivos
 
+    def get_only_music_files(self):
+        files = self.get_files_for_share()
+        return [ music_file for music_file in files if music_file.split('.')[1] in self.ext_files ]
+
     def get_my_local_ip(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
@@ -65,7 +73,7 @@ class Seeder():
         while var_exit:
             print ('aguardando conexao')
             print ("aguardando mensagem")
-            packet, addr = self.serv_socket.recvfrom(1280) 
+            packet, addr = self.serv_socket.recvfrom(self.max_data_legth) 
             print ('recebido de: ', str(addr)) 
             print ("mensagem recebida: "+ packet.decode())
             #dormir por 20 ms
@@ -86,7 +94,7 @@ if __name__ == "__main__":
 
     server = Seeder(args=args)
     
-    print(server.get_files_for_share())
+    print(server.get_only_music_files())
     server.run_server()
     
     exit()

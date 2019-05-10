@@ -2,9 +2,9 @@ import socket
 import time
 import os
 import argparse
-from pygame import mixer
 import pyaudio
 import wave
+import struct
 import sys
 
 class Seeder():
@@ -12,7 +12,7 @@ class Seeder():
                  port=7001,
                  sharead_path='.',
                  args=None):
-        self.max_data_legth = 1280
+        self.max_pack_legth = 1280
         self.ext_files = ['wav']
         self.APP_KEY = 'APP_KEY'
         self.header_size = 4
@@ -61,13 +61,21 @@ class Seeder():
         return data_addr[0]
 
     def split_files(self, name_file):
+        #retorna o tamanho em bytes
         size = os.path.getsize(name_file)
-        size_data = size/(self.max_data_legth - self.header_size)
+        self.data_size = self.max_pack_legth - self.header_size
+        num_of_packs = size/self.data_size
+        data_vector = []
+        i = 0
         f = open(name_file, 'rb')
-        # data = f.read(int(size_data))
-        data = f.read()
-        self.play_audio(data)
+        while i < num_of_packs:
+            data_vector.append(f.read(self.data_size))
+            i=i+1
         f.close()
+        print(size, self.header_size, self.max_pack_legth, num_of_packs)
+        return data_vector, num_of_packs, size
+
+        # self.play_audio(data)
         pass
 
     def play_audio(self, data):
@@ -108,16 +116,36 @@ class Seeder():
         while var_exit:
             print ('aguardando conexao')
             print ("aguardando mensagem")
-            packet, addr = self.serv_socket.recvfrom(self.max_data_legth) 
+            packet, addr = self.serv_socket.recvfrom(self.max_pack_legth) 
             print ('recebido de: ', str(addr)) 
             print ("mensagem recebida: "+ packet.decode())
             #dormir por 20 ms
-            packet = self.get_only_music_files()
             time.sleep(.020)
-            self.serv_socket.sendto(packet, addr)
+
             if packet.decode() == 'exit':
+                self.serv_socket.sendto(packet, addr)
                 var_exit = False
                 print("Fechando servidor")
+
+            elif packet.decode() in self.get_only_music_files():
+                data, num_of_packs, size = self.split_files(packet.decode())
+                msg = [num_of_packs, size]
+                print(data[0])
+                l = len(data[0])
+                msg = struct.pack('fii', num_of_packs, size, self.data_size)
+                print(len(msg))
+                self.serv_socket.sendto(msg, addr)
+                
+                i = 0
+                while i < num_of_packs:
+                    time.sleep(0.02)
+                    self.serv_socket.sendto(data[i], addr)
+                    i=i+1
+
+                var_exit = False
+
+            else:
+                self.serv_socket.sendto(packet, addr)
 
         self.serv_socket.close()
 
@@ -131,8 +159,8 @@ if __name__ == "__main__":
     server = Seeder(args=args)
     
     # print(server.get_only_music_files())
-    # server.run_server()
-    server.split_files(server.get_only_music_files()[0])
+    server.run_server()
+    # server.split_files(server.get_only_music_files()[0])
 
     
     exit()

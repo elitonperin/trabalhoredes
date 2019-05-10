@@ -1,4 +1,6 @@
+import struct
 import socket 
+import numpy
 
 max_data_legth = 1280
 class SeederInfo():
@@ -43,8 +45,29 @@ class Leecher():
         self.cli_socket.close()
 
     def request_file(self):
+        self.cli_socket.sendto("cello.wav".encode(), self.list_seeders[0].addr)
+        print('Solicitacao enviada')
+        msg, addr = self.cli_socket.recvfrom(self.max_data_legth)
+        
+        num_of_packs, size, data_size = struct.unpack('fii', msg)
+        print(num_of_packs, size, data_size)
+        i = 0
+
+        data = []
+        while i < num_of_packs:
+            msg, addr = self.cli_socket.recvfrom(data_size)
+            data.append(msg)
+            i=i+1
+        data = b''.join(data)
+        f = open("novo.wav", "w+b")
+        f.write(data)
+        f.close()
+
+    def modulo_losts(self):
+        numpy.random.exponential()
         pass
 
 leecher = Leecher()
 ip, port = leecher.broadcast()
-leecher.run_client()
+# leecher.run_client()
+leecher.request_file()

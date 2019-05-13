@@ -78,28 +78,30 @@ class Seeder():
         # self.play_audio(data)
         pass
 
-    def play_audio(self, data):
-        
-        chunk = 1024
+    def setup_player(self):
+        self.chunk = 1024
         FORMAT = pyaudio.paInt16
         CHANNELS = 2
         RATE = 50000
+             
+        self.player = pyaudio.PyAudio()
 
-        p = pyaudio.PyAudio()
-
-        stream = p.open(format = FORMAT,
+        self.stream = self.player.open(format = FORMAT,
                         channels = CHANNELS,
                         rate = RATE,
                         input = True,
                         output = True,
-                        frames_per_buffer = chunk)
+                        frames_per_buffer = self.chunk)
 
-        for i in range(0, len(data), chunk):
-            stream.write(data[i:i+chunk])
-        stream.stop_stream()
-        stream.close()
+    def finish(self):
+        self.stream.close()
+        self.player.terminate()
 
-        p.terminate()
+    def play_audio(self, data):
+
+        for i in range(0, len(data), self.chunk):
+            self.stream.write(data[i:i+self.chunk])
+        self.stream.stop_stream()
 
     def sequencial_transmission(self):
         pass
@@ -119,35 +121,43 @@ class Seeder():
             packet, addr = self.serv_socket.recvfrom(self.max_pack_legth) 
             print ('recebido de: ', str(addr)) 
             print ("mensagem recebida: "+ packet.decode())
-            #dormir por 20 ms
-            time.sleep(.020)
+            comando = packet.decode()
 
-            if packet.decode() == 'exit':
-                self.serv_socket.sendto(packet, addr)
+            if comando == 'exit':
+                self.quit()
+            elif comando == 'requisicao':
+                self.request_file(addr)
+            elif comando in self.get_only_music_files():
+                self.send_file(comando, addr)
                 var_exit = False
-                print("Fechando servidor")
-
-            elif packet.decode() in self.get_only_music_files():
-                data, num_of_packs, size = self.split_files(packet.decode())
-                msg = [num_of_packs, size]
-                print(data[0])
-                l = len(data[0])
-                msg = struct.pack('fii', num_of_packs, size, self.data_size)
-                print(len(msg))
-                self.serv_socket.sendto(msg, addr)
-                
-                i = 0
-                while i < num_of_packs:
-                    time.sleep(0.02)
-                    self.serv_socket.sendto(data[i], addr)
-                    i=i+1
-
-                var_exit = False
-
             else:
                 self.serv_socket.sendto(packet, addr)
+    
+    def state1(self):
+        pass
+        
+    def request_file(self, addr):
+        pass
 
+    def send_file(self, comando, addr):
+        data, num_of_packs, size = self.split_files(comando)
+        msg = [num_of_packs, size]
+        print(data[0])
+        msg = struct.pack('fii', num_of_packs, size, self.data_size)
+        self.serv_socket.sendto(msg, addr)
+        
+        i = 0
+        while i < num_of_packs:
+            time.sleep(0.02)
+            self.serv_socket.sendto(data[i], addr)
+            i=i+1
+
+        pass
+
+    def quit(self):
+        print("Fechando servidor")
         self.serv_socket.close()
+        exit()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="testing btpeer.py")

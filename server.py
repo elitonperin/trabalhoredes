@@ -4,6 +4,7 @@ import socket
 # import thread module 
 from _thread import *
 import threading 
+import random
 
 print_lock = threading.Lock() 
 
@@ -12,55 +13,92 @@ class NodeServer():
     def __init__(self, addr=None):
         self.max_pack_legth = 1280
         self.addr = addr
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST,1)
-        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.sk = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sk.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST,1)
+        self.sk.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         if addr is not None:
-            self.socket.bind(self.addr) 
+            self.sk.bind(self.addr) 
+            print("Criado novo socket UDP")
+            print("Enderecos: ", addr[0], " : ", addr[1])
+        else:
+            self.sk.bind(('', 0))
+            addr = self.sk.getsockname()
+            print("Enderecos: ", addr[0], " : ", addr[1])
 
-    def threaded(self): 
+    def threaded(self, addr, data): 
+        print('Thread servidor mandando para: ', addr[0], ':', addr[1])
+        self.sk.sendto(data, addr)
 
         while True: 
 
             # data received from client 
-            packet, addr = self.socket.recvfrom(self.max_pack_legth) 
+            packet, addr = self.sk.recvfrom(self.max_pack_legth) 
+            print('Thread servidor recebendo de: ', addr[0], ':', addr[1])
+            print(packet.decode())
+            print(addr)
+            ans = input('\nDo you want to continue(y/n) :') 
             if not packet: 
                 print('Bye') 
                 
                 # lock released on exit 
                 # print_lock.release() 
                 break
+            elif ans == 'exit':
+                break
 
             # reverse the given string from client 
             data = packet[::-1] 
 
             # send back reversed string to client 
-            self.socket.sendto(data, addr) 
+            print('Thread servidor mandando para: ', addr[0], ':', addr[1])
+            self.sk.sendto(data, addr) 
 
         # connection closed 
-        self.socket.close() 
+        self.sk.close()
+
+    def thread_client(self, data, addr):
+
+        while True: 
+            # ask the client whether he wants to continue 
+            ans = input('\nDo you want to continue(y/n) :') 
+            if ans == 'y': 
+                continue
+            elif ans == 'exit':
+                break
+            data = ans.encode()
+            print('Thread cliente mandando para: ', addr[0], ':', addr[1])
+            self.sk.sendto(data, addr)
+
+            # data received from client 
+            packet, addr = self.sk.recvfrom(self.max_pack_legth) 
+            print('Thread cliebte recebendo de: ', addr[0], ':', addr[1])
+            print(packet.decode())
+            print(addr)
+
+
+        # connection closed 
+        self.sk.close()
+        
 
 
 def Main(): 
-	host = "" 
-	port = 12345
-    addr1 = (host, port)
-    
+    host = ""
+    port = 12345
+    addr1 = (host, port) 
     s = NodeServer(addr1)
+    # a forever loop until client wants to exit 
+    while True: 
 
-	print("socket is listening") 
-
-	# a forever loop until client wants to exit 
-	while True: 
-
-		# lock acquired by client 
-		# print_lock.acquire() 
-        data, addr = s.socket.recvfrom(self.max_pack_length)
-		print('Connected to :', addr[0], ':', addr[1]) 
-
-		# Start a new thread and return its identifier 
-		start_new_thread(self.threaded, (addr,)) 
-	s.close() 
+        # lock acquired by client 
+        # print_lock.acquire() 
+        data, addr = s.sk.recvfrom(s.max_pack_legth)
+        print('Primeira conexao :', addr[0], ':', addr[1]) 
+        # Start a new thread and return its identifier 
+        if data.decode() == "new":
+            num = random.randint(49152, 65534)
+            n = NodeServer(("", num))
+            start_new_thread(n.threaded, (addr,data)) 
+    s.sk.close() 
 
 
 if __name__ == '__main__': 

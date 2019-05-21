@@ -1,6 +1,11 @@
 # Import socket module 
 import socket 
 from server import NodeServer
+import random
+# import thread module 
+from _thread import *
+import time
+import threading 
 
 def Main(): 
 	# local host IP '127.0.0.1' 
@@ -12,25 +17,24 @@ def Main():
 
 	s = NodeServer()
 
-	message = "shaurya says geeksforgeeks"
-	while True: 
+	message = "new"
+	# message sent to server 
+	s.sk.sendto(message.encode(), addr_send) 
 
-		# message sent to server 
-		s.sendto(message.encode('ascii'), addr_send) 
-
-		# messaga received from server 
-		data = s.recv(1024) 
-
-		# print the received message 
-		# here it would be a reverse of sent message 
-		print('Received from the server :',str(data.decode('ascii'))) 
-
-		# ask the client whether he wants to continue 
-		ans = input('\nDo you want to continue(y/n) :') 
-		if ans == 'y': 
-			continue
-		else: 
-			break
+	
+	data, addr = s.sk.recvfrom(s.max_pack_legth) 
+	# messaga received from server 
+	# print the received message 
+	# here it would be a reverse of sent message 
+	print('Primeira conexao :', str(data.decode()))
+	num = random.randint(49152, 65534)
+	n = NodeServer(("", num))
+	start_new_thread(n.thread_client, (data, addr)) 
+	running = True
+	while running:
+		ans = input("Ver rede: ")
+		if ans == 'exit':
+			running = False
 
 if __name__ == '__main__': 
 	Main() 

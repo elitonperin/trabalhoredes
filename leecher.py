@@ -3,6 +3,10 @@ import socket
 import numpy
 import pyaudio
 from pydub import AudioSegment
+import random
+from NodeSocket import NodeSocket
+from _thread import *
+import threading 
 
 def funcao_tocar_mp3():
     from pydub import AudioSegment
@@ -44,7 +48,7 @@ class Leecher():
     def __init__(self, args=None):
         self.port = 7001
         self.ip_broadcast = self.my_mask_for_broadcast()
-        self.max_data_legth = 1280
+        self.max_data_length = 1280
         self.list_seeders = []
         self.APP_KEY = 'APP_KEY'
         
@@ -78,7 +82,7 @@ class Leecher():
         self.cli_socket.sendto(self.APP_KEY.encode(),
                   (self.ip_broadcast, self.port))
         print('Broadcast enviado')
-        msg, addr = self.cli_socket.recvfrom(self.max_data_legth)
+        msg, addr = self.cli_socket.recvfrom(self.max_data_length)
         s = SeederInfo(ip=addr[0], port=addr[1])
         self.list_seeders.append(s)
         return addr
@@ -120,7 +124,7 @@ class Leecher():
     def request_file(self):
         self.cli_socket.sendto("cello.wav".encode(), self.list_seeders[0].addr)
         print('Solicitacao enviada')
-        msg, addr = self.cli_socket.recvfrom(self.max_data_legth)
+        msg, addr = self.cli_socket.recvfrom(self.max_data_length)
         
         num_of_packs, size, data_size = struct.unpack('fii', msg)
         print(num_of_packs, size, data_size)
@@ -146,7 +150,34 @@ class Leecher():
         numpy.random.exponential()
         pass
 
-leecher = Leecher()
-ip, port = leecher.broadcast()
+# leecher = Leecher()
+# ip, port = leecher.broadcast()
 # leecher.run_client()
-leecher.request_file()
+# leecher.request_file()
+# local host IP '127.0.0.1' 
+host = '127.0.0.1'
+
+# Define the port on which you want to connect 
+port = 7001
+addr_send = (host,port)
+
+client = Leecher()
+
+message = "new"
+# message sent to server 
+client.cli_socket.sendto(message.encode(), addr_send) 
+
+
+data, addr = client.cli_socket.recvfrom(client.max_data_length) 
+# messaga received from server 
+# print the received message 
+# here it would be a reverse of sent message 
+print('Primeira conexao :', str(data.decode()))
+num = random.randint(49152, 65534)
+n = NodeSocket(client,("", num))
+start_new_thread(n.thread_client, (data, addr)) 
+running = True
+while running:
+    ans = input("Ver rede: ")
+    if ans == 'exit':
+        running = False

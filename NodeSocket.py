@@ -5,12 +5,14 @@ import socket
 from _thread import *
 import threading 
 import random
+import struct
 
 print_lock = threading.Lock() 
 
 # thread fuction 
-class NodeServer():
-    def __init__(self, addr=None):
+class NodeSocket():
+    def __init__(self, parent, addr=None):
+        self.parent = parent
         self.max_pack_legth = 1280
         self.addr = addr
         self.sk = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -25,17 +27,31 @@ class NodeServer():
             addr = self.sk.getsockname()
             print("Enderecos: ", addr[0], " : ", addr[1])
 
-    def threaded(self, addr, data): 
+    def thread_server(self, addr, data): 
         print('Thread servidor mandando para: ', addr[0], ':', addr[1])
-        self.sk.sendto(data, addr)
+        n_seq = -1
+        init_segm = 0
+        final_segm = 0
+        ack = 0
+        nack = 0
+        cmd = 'nop'
+        data = b'TEXTO'
+        packet = struct.pack('siiiii', 
+                                       cmd,
+                                       n_seq, 
+                                       init_segm, 
+                                       final_segm, 
+                                       ack,
+                                       nack,
+                                       data )
+        self.sk.sendto(packet, addr)
 
         while True: 
 
             # data received from client 
-            packet, addr = self.sk.recvfrom(self.max_pack_legth) 
+            packet, addr = self.sk.recvfrom(self.max_pack_legth)
+            n_seq, init_segm, final_segm, ack, nack, cmd = struct.unpack('iiiiif', packet)
             print('Thread servidor recebendo de: ', addr[0], ':', addr[1])
-            print(packet.decode())
-            print(addr)
             ans = input('\nDo you want to continue(y/n) :') 
             if not packet: 
                 print('Bye') 
@@ -47,7 +63,7 @@ class NodeServer():
                 break
 
             # reverse the given string from client 
-            data = packet[::-1] 
+            data = data[::-1] 
 
             # send back reversed string to client 
             print('Thread servidor mandando para: ', addr[0], ':', addr[1])
@@ -67,7 +83,7 @@ class NodeServer():
 
                 print('Deseja baixar:\n (y/n):')
                 ### baixa
-                data = ans.encode()
+                data = ans1.encode()
                 print('Thread cliente mandando para: ', addr[0], ':', addr[1])
                 self.sk.sendto(data, addr)
 
@@ -82,27 +98,3 @@ class NodeServer():
 
         # connection closed 
         self.sk.close()
-        
-
-
-def Main(): 
-    host = ""
-    port = 12345
-    addr1 = (host, port) 
-    s = NodeServer(addr1)
-    # a forever loop until client wants to exit 
-    while True: 
-
-        # lock acquired by client 
-        # print_lock.acquire() 
-        data, addr = s.sk.recvfrom(s.max_pack_legth)
-        print('Primeira conexao :', addr[0], ':', addr[1]) 
-        # Start a new thread and return its identifier 
-        if data.decode() == "new":
-            num = random.randint(49152, 65534)
-            n = NodeServer(("", num))
-            start_new_thread(n.threaded, (addr,data)) 
-    s.sk.close() 
-
-if __name__ == '__main__': 
-	Main() 

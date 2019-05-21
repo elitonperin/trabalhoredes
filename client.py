@@ -22,7 +22,8 @@ def Main():
 	s.sk.sendto(message.encode(), addr_send) 
 
 	
-	data, addr = s.sk.recvfrom(s.max_pack_legth) 
+	packet, addr = s.sk.recvfrom(s.max_pack_legth) 
+	n_seq, init_segm, final_segm, ack, nack, cmd = struct.unpack('iiiiif', packet)
 	# messaga received from server 
 	# print the received message 
 	# here it would be a reverse of sent message 

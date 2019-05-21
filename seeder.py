@@ -6,6 +6,10 @@ import pyaudio
 import wave
 import struct
 import sys
+import random
+from NodeSocket import NodeSocket
+from _thread import *
+import threading 
 
 class Seeder():
     def __init__(self, host='127.0.0.1', 
@@ -168,8 +172,26 @@ if __name__ == "__main__":
 
     server = Seeder(args=args)
     
+    host = ""
+    port = 12345
+    addr1 = (host, port) 
+    # a forever loop until client wants to exit 
+    while True: 
+
+        # lock acquired by client 
+        # print_lock.acquire() 
+        packet, addr = server.serv_socket.recvfrom(server.max_pack_legth)
+        n_seq, init_segm, final_segm, ack, nack, cmd = struct.unpack('iiiiif', packet)
+        print('Primeira conexao :', addr[0], ':', addr[1]) 
+        # Start a new thread and return its identifier 
+        if packet.decode() == "new":
+            num = random.randint(49152, 65534)
+            n = NodeSocket(server, ("", num))
+            start_new_thread(n.thread_server, (addr,packet)) 
+    server.serv_socket.close() 
+    
     # print(server.get_only_music_files())
-    server.run_server()
+    # server.run_server()
     # server.split_files(server.get_only_music_files()[0])
 
     

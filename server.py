@@ -8,6 +8,8 @@ import random
 
 print_lock = threading.Lock() 
 
+serv_ans = True
+
 # thread fuction 
 class NodeServer():
     def __init__(self, addr=None):
@@ -25,7 +27,7 @@ class NodeServer():
             addr = self.sk.getsockname()
             print("Enderecos: ", addr[0], " : ", addr[1])
 
-    def threaded(self, addr, data): 
+    def thread_server(self, addr, data): 
         print('Thread servidor mandando para: ', addr[0], ':', addr[1])
         self.sk.sendto(data, addr)
 
@@ -44,6 +46,7 @@ class NodeServer():
                 # print_lock.release() 
                 break
             elif ans == 'exit':
+                serv_ans = False
                 break
 
             # reverse the given string from client 
@@ -54,35 +57,7 @@ class NodeServer():
             self.sk.sendto(data, addr) 
 
         # connection closed 
-        self.sk.close()
-
-    def thread_client(self, data, addr):
-
-        while True: 
-            # ask the client whether he wants to continue 
-            ans = input('\nO que vc quer :\n1-Buscar musica\n2 - sair') 
-            if ans == '1':
-                ans1 = input('\nDigita nome:\n') 
-                ### busca
-
-                print('Deseja baixar:\n (y/n):')
-                ### baixa
-                data = ans.encode()
-                print('Thread cliente mandando para: ', addr[0], ':', addr[1])
-                self.sk.sendto(data, addr)
-
-                # data received from client 
-                packet, addr = self.sk.recvfrom(self.max_pack_legth) 
-                print('Thread cliebte recebendo de: ', addr[0], ':', addr[1])
-                print(packet.decode())
-                print(addr)
-            elif ans == '2': 
-                break
-
-
-        # connection closed 
-        self.sk.close()
-        
+        self.sk.close()        
 
 
 def Main(): 
@@ -91,17 +66,15 @@ def Main():
     addr1 = (host, port) 
     s = NodeServer(addr1)
     # a forever loop until client wants to exit 
-    while True: 
+    while serv_ans: 
 
-        # lock acquired by client 
-        # print_lock.acquire() 
         data, addr = s.sk.recvfrom(s.max_pack_legth)
         print('Primeira conexao :', addr[0], ':', addr[1]) 
         # Start a new thread and return its identifier 
         if data.decode() == "new":
             num = random.randint(49152, 65534)
             n = NodeServer(("", num))
-            start_new_thread(n.threaded, (addr,data)) 
+            start_new_thread(n.thread_server, (addr,data)) 
     s.sk.close() 
 
 if __name__ == '__main__': 

@@ -1,6 +1,5 @@
 # import socket programming library 
 import socket 
-
 # import thread module 
 from _thread import *
 import threading 
@@ -34,9 +33,9 @@ class NodeSocket():
         final_segm = 0
         ack = 0
         nack = 0
-        cmd = 'nop'
-        data = b'TEXTO'
-        packet = struct.pack('siiiii', 
+        cmd = 'new'
+        data = 'TEXTO'
+        packet = struct.pack('3siiiiis', 
                                        cmd,
                                        n_seq, 
                                        init_segm, 
@@ -50,7 +49,7 @@ class NodeSocket():
 
             # data received from client 
             packet, addr = self.sk.recvfrom(self.max_pack_legth)
-            n_seq, init_segm, final_segm, ack, nack, cmd = struct.unpack('iiiiif', packet)
+            cmd, n_seq, init_segm, final_segm, ack, nack, data  = struct.unpack('3siiiiis', packet)
             print('Thread servidor recebendo de: ', addr[0], ':', addr[1])
             ans = input('\nDo you want to continue(y/n) :') 
             if not packet: 

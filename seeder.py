@@ -11,15 +11,79 @@ from NodeSocket import NodeSocket
 from _thread import *
 import threading 
 
+SERVER_ON = True
+
+# thread fuction 
+class NodeServer():
+    def __init__(self, parent, addr=None):
+        self.parent = parent
+        self.max_pack_legth = 1280
+        self.addr = addr
+        self.sk = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sk.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST,1)
+        self.sk.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        if addr is not None:
+            self.sk.bind(self.addr) 
+            print("Criado novo socket UDP")
+            print("Enderecos: ", addr[0], " : ", addr[1])
+        else:
+            self.sk.bind(('', 0))
+            addr = self.sk.getsockname()
+            print("Enderecos: ", addr[0], " : ", addr[1])
+
+    def thread_server(self, addr, data): 
+        print('Thread servidor mandando para: ', addr[0], ':', addr[1])
+        self.sk.sendto(data, addr)
+        send_header = ''
+        send_data = ''
+
+        while True: 
+
+            # data received from client 
+            recv_packet, addr = self.sk.recvfrom(self.max_pack_legth) 
+            print('Thread servidor recebendo de: ', addr[0], ':', addr[1])
+            print('Mensagem: ', recv_packet.decode())
+
+            recv_header = recv_packet[:12]
+            recv_data = recv_packet[12:]
+
+            cmd, num_seq, size_data = struct.unpack('3sii', recv_header)
+            print(cmd)
+            if cmd == 'ext':
+                self.parent.quit()
+            elif cmd == b'req':
+                has = self.parent.request_file(recv_data, size_data, addr)
+                if has:
+                    header = struct.pack('3sii', b'yes', num_seq+1, size_data)
+                else:
+                    header = struct.pack('3sii', b'not', num_seq+1, size_data)
+            elif cmd == b'dow':
+                self.parent.send_file(cmd, addr)
+                var_exit = False
+            elif cmd == b'exi':
+                self.sk.close()
+                self.parent.quit()
+            else:
+                print('Comando Invalido!')
+            # self.sk.sendto(recv_packet, addr)
+            send_packet = header + recv_data
+            # send back reversed string to client 
+            print('Thread servidor mandando para: ', addr[0], ':', addr[1])
+            print('Send packet with: ', send_packet.decode())
+            self.sk.sendto(send_packet, addr) 
+
+        # connection closed 
+
 class Seeder():
     def __init__(self, host='127.0.0.1', 
                  port=7001,
                  sharead_path='.',
                  args=None):
         self.max_pack_legth = 1280
-        self.ext_files = ['wav']
+        self.ext_files = ['wav', 'mp3']
         self.APP_KEY = 'APP_KEY'
         self.header_size = 4
+        self.nodes_of_connections = []
         
         if args.port is not None:
             self.port=args.port
@@ -117,31 +181,34 @@ class Seeder():
         pass
 
     def run_server(self):
-        var_exit = True
+        # a forever loop until client wants to exit 
+        self.connect_count = 0
 
-        while var_exit:
-            print ('aguardando conexao')
-            print ("aguardando mensagem")
+        while SERVER_ON: 
             packet, addr = self.serv_socket.recvfrom(self.max_pack_legth) 
-            print ('recebido de: ', str(addr)) 
-            print ("mensagem recebida: "+ packet.decode())
-            comando = packet.decode()
-
-            if comando == 'exit':
-                self.quit()
-            elif comando == 'requisicao':
-                self.request_file(addr)
-            elif comando in self.get_only_music_files():
-                self.send_file(comando, addr)
-                var_exit = False
-            else:
-                self.serv_socket.sendto(packet, addr)
+            self.connect_count += 1
+            print('Conexao n:', self.connect_count)
+            print('Com endereco: ', addr[0], ':', addr[1]) 
+            # Start a new thread and return its identifier 
+            if packet.decode() == self.APP_KEY:
+                num = random.randint(49152, 65534)
+                n = NodeServer(self, ("", num))
+                self.nodes_of_connections.append(n)
+                start_new_thread(n.thread_server, (addr, packet)) 
+        self.serv_socket.close()
     
     def state1(self):
         pass
         
-    def request_file(self, addr):
-        pass
+    def request_file(self, name, size_data, addr):
+        print('Request file: ', name)
+        song_name = name.decode()
+        print(song_name)
+        print(self.get_only_music_files())
+        if song_name in self.get_only_music_files():
+            return True
+        else:
+            return False
 
     def send_file(self, comando, addr):
         data, num_of_packs, size = self.split_files(comando)
@@ -172,26 +239,27 @@ if __name__ == "__main__":
 
     server = Seeder(args=args)
     
-    host = ""
-    port = 12345
-    addr1 = (host, port) 
-    # a forever loop until client wants to exit 
-    while True: 
+    server.run_server()
 
-        # lock acquired by client 
-        # print_lock.acquire() 
-        packet, addr = server.serv_socket.recvfrom(server.max_pack_legth)
-        n_seq, init_segm, final_segm, ack, nack, cmd = struct.unpack('iiiiif', packet)
-        print('Primeira conexao :', addr[0], ':', addr[1]) 
-        # Start a new thread and return its identifier 
-        if packet.decode() == "new":
-            num = random.randint(49152, 65534)
-            n = NodeSocket(server, ("", num))
-            start_new_thread(n.thread_server, (addr,packet)) 
-    server.serv_socket.close() 
+    
+    # a forever loop until client wants to exit 
+    # while True: 
+
+    #     # lock acquired by client 
+    #     # print_lock.acquire() 
+    #     packet, addr = server.serv_socket.recvfrom(server.max_pack_legth)
+    #     cmd, n_seq, init_segm, final_segm, ack, nack, data = struct.unpack('3s i i i i i s', packet)
+    #     print('Primeira conexao :', addr[0], ':', addr[1]) 
+    #     print(cmd, data)
+    #     # Start a new thread and return its identifier
+
+    #     if cmd == "new":
+    #         num = random.randint(49152, 65534)
+    #         n = NodeSocket(server, ("", num))
+    #         start_new_thread(n.thread_server, (addr,packet)) 
+    # server.serv_socket.close() 
     
     # print(server.get_only_music_files())
-    # server.run_server()
     # server.split_files(server.get_only_music_files()[0])
 
     

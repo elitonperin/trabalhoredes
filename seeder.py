@@ -20,6 +20,10 @@ class NodeServer():
         self.parent = parent
         self.max_pack_legth = 1280
         self.addr = addr
+        self.transmission_opt = 'rand'
+        self.transmission_opt = 'srand'
+        self.transmission_opt = 'simple'
+        self.transmission_opt = 'seq'
         self.sk = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sk.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST,1)
         self.sk.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -32,14 +36,16 @@ class NodeServer():
             addr = self.sk.getsockname()
             print("Enderecos: ", addr[0], " : ", addr[1])
     
-    def send_file(self, cmd, addr, recv_packet):
-        recv_header = recv_packet[:20]
-        cmd, num_seq, size_data, init, end = struct.unpack('3siiii', recv_header)
-        recv_data = recv_packet[20:]
-        song_name = recv_data.decode()
-        finish = False
-        self.parent.header_size = 20
-        data, num_of_packs, size = self.parent.split_files(song_name)
+    def sequencial_transmission(self, init, end, cmd, num_seq, data, size_data, addr):
+        pass
+    
+    def random_transmission(self, init, end, cmd, num_seq, data, size_data, addr):
+        pass
+
+    def seq_random_transmission(self, init, end, cmd, num_seq, data, size_data, addr):
+        pass
+        
+    def normal_transmission(self, init, end, cmd, num_seq, data, size_data, addr):
         i = init
         while i*self.parent.data_size < end:
             send_header = struct.pack('3siiii', cmd, num_seq+1, size_data, init, end)
@@ -53,7 +59,25 @@ class NodeServer():
             recv_data = recv_packet[20:]
             song_name = recv_data.decode()
 
+    def send_file(self, cmd, addr, recv_packet):
+        
+        recv_header = recv_packet[:20]
+        cmd, num_seq, size_data, init, end = struct.unpack('3siiii', recv_header)
+        recv_data = recv_packet[20:]
+        song_name = recv_data.decode()
+        finish = False
+        self.parent.header_size = 20
+        data, num_of_packs, size = self.parent.split_files(song_name)
 
+        if self.transmission_opt == 'seq':
+            self.sequencial_transmission(init, end, cmd, num_seq, data, size_data, addr)
+        elif self.transmission_opt == 'rand':
+            self.random_transmission(init, end, cmd, num_seq, data, size_data, addr)
+        elif self.transmission_opt == 'srand':
+            self.seq_random_transmission(init, end, cmd, num_seq, data, size_data, addr)
+        else:
+            self.normal_transmission(init, end, cmd, num_seq, data, size_data, addr)
+        
         pass
 
     def thread_server(self, addr, data): 
@@ -74,7 +98,7 @@ class NodeServer():
 
             cmd, num_seq, size_data = struct.unpack('3sii', recv_header)
             print(cmd)
-            if cmd == 'ext':
+            if cmd == b'ext':
                 print('Saindo')
                 self.parent.quit()
             elif cmd == b'req':
@@ -204,15 +228,6 @@ class Seeder():
         for i in range(0, len(data), self.chunk):
             self.stream.write(data[i:i+self.chunk])
         self.stream.stop_stream()
-
-    def sequencial_transmission(self):
-        pass
-    
-    def random_transmission(self):
-        pass
-
-    def seq_random_transmission(self):
-        pass
 
     def run_server(self):
         # a forever loop until client wants to exit 

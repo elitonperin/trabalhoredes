@@ -37,6 +37,18 @@ class NodeServer():
             print("Enderecos: ", addr[0], " : ", addr[1])
     
     def sequencial_transmission(self, init, end, cmd, num_seq, data, size_data, addr):
+        i = init
+        while i*self.parent.data_size < end:
+            send_header = struct.pack('3siiii', cmd, num_seq+1, size_data, init, end)
+            time.sleep(0.02)
+            send_packet = send_header + data[i]
+            self.sk.sendto(send_packet, addr)
+            i=i+1
+            recv_packet, addr = self.sk.recvfrom(self.max_pack_legth)
+            recv_header = recv_packet[:20]
+            cmd, num_seq, size_data, init, end = struct.unpack('3siiii', recv_header)
+            recv_data = recv_packet[20:]
+            song_name = recv_data.decode()
         pass
     
     def random_transmission(self, init, end, cmd, num_seq, data, size_data, addr):

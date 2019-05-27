@@ -1,6 +1,7 @@
 import socket 
 import time
 import os
+import stat
 import argparse
 import pyaudio
 import wave
@@ -30,6 +31,30 @@ class NodeServer():
             self.sk.bind(('', 0))
             addr = self.sk.getsockname()
             print("Enderecos: ", addr[0], " : ", addr[1])
+    
+    def send_file(self, cmd, addr, recv_packet):
+        recv_header = recv_packet[:20]
+        cmd, num_seq, size_data, init, end = struct.unpack('3siiii', recv_header)
+        recv_data = recv_packet[20:]
+        song_name = recv_data.decode()
+        finish = False
+        self.parent.header_size = 20
+        data, num_of_packs, size = self.parent.split_files(song_name)
+        i = init
+        while i*self.parent.data_size < end:
+            send_header = struct.pack('3siiii', cmd, num_seq+1, size_data, init, end)
+            time.sleep(0.02)
+            send_packet = send_header + data[i]
+            self.sk.sendto(send_packet, addr)
+            i=i+1
+            recv_packet, addr = self.sk.recvfrom(self.max_pack_legth)
+            recv_header = recv_packet[:20]
+            cmd, num_seq, size_data, init, end = struct.unpack('3siiii', recv_header)
+            recv_data = recv_packet[20:]
+            song_name = recv_data.decode()
+
+
+        pass
 
     def thread_server(self, addr, data): 
         print('Thread servidor mandando para: ', addr[0], ':', addr[1])
@@ -42,7 +67,7 @@ class NodeServer():
             # data received from client 
             recv_packet, addr = self.sk.recvfrom(self.max_pack_legth) 
             print('Thread servidor recebendo de: ', addr[0], ':', addr[1])
-            print('Mensagem: ', recv_packet.decode())
+            # print('Mensagem: ', recv_packet.decode())
 
             recv_header = recv_packet[:12]
             recv_data = recv_packet[12:]
@@ -50,26 +75,36 @@ class NodeServer():
             cmd, num_seq, size_data = struct.unpack('3sii', recv_header)
             print(cmd)
             if cmd == 'ext':
+                print('Saindo')
                 self.parent.quit()
             elif cmd == b'req':
-                has = self.parent.request_file(recv_data, size_data, addr)
+                print('Sendo requisitado')
+                has, size_file = self.parent.request_file(recv_data, size_data, addr)
                 if has:
                     header = struct.pack('3sii', b'yes', num_seq+1, size_data)
+                    data_send = struct.pack('i', size_file)
                 else:
                     header = struct.pack('3sii', b'not', num_seq+1, size_data)
+                    data_send = struct.pack('i', 0)
             elif cmd == b'dow':
-                self.parent.send_file(cmd, addr)
+                print('Fazendo upload')
+                self.send_file(cmd, addr, recv_packet)
+                header = struct.pack('3siiii', b'fin',  num_seq+1, size_data, 0, 0)
+                data_send = struct.pack('i', 0)
                 var_exit = False
             elif cmd == b'exi':
+                print('Saindo')
                 self.sk.close()
                 self.parent.quit()
             else:
                 print('Comando Invalido!')
             # self.sk.sendto(recv_packet, addr)
-            send_packet = header + recv_data
+            print(sys.getsizeof(header))
+            print(sys.getsizeof(data_send))
+            send_packet = header + data_send
             # send back reversed string to client 
             print('Thread servidor mandando para: ', addr[0], ':', addr[1])
-            print('Send packet with: ', send_packet.decode())
+            #print('Send packet with: ', send_packet.decode())
             self.sk.sendto(send_packet, addr) 
 
         # connection closed 
@@ -140,11 +175,10 @@ class Seeder():
             data_vector.append(f.read(self.data_size))
             i=i+1
         f.close()
+        # self.play_audio(data)
         print(size, self.header_size, self.max_pack_legth, num_of_packs)
         return data_vector, num_of_packs, size
 
-        # self.play_audio(data)
-        pass
 
     def setup_player(self):
         self.chunk = 1024
@@ -206,12 +240,20 @@ class Seeder():
         print(song_name)
         print(self.get_only_music_files())
         if song_name in self.get_only_music_files():
-            return True
+            file_stats = os.stat(os.path.join(self.sharead_path, song_name))
+            print('Tem, mandando info')
+            return True, file_stats[stat.ST_SIZE]
         else:
-            return False
+            return False, None
 
-    def send_file(self, comando, addr):
-        data, num_of_packs, size = self.split_files(comando)
+    def send_file(self, comando, addr, recv_packet):
+        recv_header = recv_packet[:14]
+        cmd, num_seq, size_data, init, end = struct.unpack('3siiii', recv_header)
+        recv_data = recv_packet[14:]
+        song_name = recv_data.decode()
+        print(song_name)
+        self.header_size = 14
+        data, num_of_packs, size = self.split_files(song_name)
         msg = [num_of_packs, size]
         print(data[0])
         msg = struct.pack('fii', num_of_packs, size, self.data_size)

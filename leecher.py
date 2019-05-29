@@ -10,6 +10,8 @@ import random
 import time
 import struct
 import numpy
+import logging
+from datetime import datetime
 
 #import audio module
 import pyaudio
@@ -38,12 +40,12 @@ class NodeServer():
 		self.event = threading.Event()
 		if addr is not None:
 			self.sk.bind(self.addr) 
-			print("Criado novo socket UDP")
-			print("Enderecos: ", addr[0], " : ", addr[1])
 		else:
 			self.sk.bind(('', 0))
-			addr = self.sk.getsockname()
-			print("Enderecos: ", addr[0], " : ", addr[1])
+			self.addr = self.sk.getsockname()
+		self.port = self.addr[1]
+		self.ip = self.addr[0]	
+		logging.info('Criando socket UDP com IP:PORT: '+str(self.addr[0]) + str(self.addr[1]))
 	
 	def header_request(self, num_seq, size_data):
 		header = struct.pack('3sii', b'req', num_seq, size_data)
@@ -56,18 +58,28 @@ class NodeServer():
 	def download(self, num_seq, song_name, addr):
 		finish = False
 		file_ = []
-		i = self.init
-		size_data = 0
+		
+		send_header = self.header_download(num_seq+1, len(song_name), int(self.init), int(self.end))
+		send_data = song_name.encode()
+		send_packet = send_header + send_data
+		# print('Thread cliente mandando para: ', addr[0], ':', addr[1])
+		self.sk.sendto(send_packet, addr)
+		
+		# data received from client 
+		recv_packet, addr = self.sk.recvfrom(self.max_pack_legth) 
+		# print('Thread cliente recebendo de: ', addr[0], ':', addr[1])
+		recv_header = recv_packet[:20]
+		cmd, num_seq, size_data, init, end = struct.unpack('3siiii', recv_header)
+		i = int(self.init/size_data)
+		file_.append(recv_packet[20:])
+		
 		while i*size_data < self.end:
 			send_header = self.header_download(num_seq+1, len(song_name), int(self.init), int(self.end))
 			send_data = song_name.encode()
 			send_packet = send_header + send_data
-			print('Thread cliente mandando para: ', addr[0], ':', addr[1])
 			self.sk.sendto(send_packet, addr)
-			
 			# data received from client 
 			recv_packet, addr = self.sk.recvfrom(self.max_pack_legth) 
-			print('Thread cliente recebendo de: ', addr[0], ':', addr[1])
 			recv_header = recv_packet[:20]
 			cmd, num_seq, size_data, init, end = struct.unpack('3siiii', recv_header)
 			if cmd != b'fin':
@@ -75,13 +87,10 @@ class NodeServer():
 				file_.append(recv_data)
 			else:
 				i = self.end + 1
-
 		data = b''.join(file_)
-		f = open("novo1.wav", "w+b")
-		f.write(data)
-		f.close()
-		
-		return num_seq
+		logging.info('Quantidade de dados de pacotes recebidos: ' + str(len(data)))
+	
+		return num_seq, data
 
 	def thread_client(self, event, data, addr):
 		self.on = True
@@ -89,25 +98,22 @@ class NodeServer():
 		while self.on:
 			event.wait()
 			self.event.clear()
-			print('Executando')
 			if self.download_req:
-				num_seq = self.download(num_seq, self.parent.song_to_search, addr)
-				if num_seq > 10:
-					self.event.set()
-				print('Req', num_seq)
+				logging.info('Fazendo download da musica: ' + self.parent.song_to_search)
+				num_seq, data = self.download(num_seq, self.parent.song_to_search, addr)
+				self.data = data
+				self.event.set()
+				time.sleep(0.3)
 				num_seq += 1
 			elif self.search_song_op:
-				print('Procurando musica')
-				### busca
+				logging.info('Buscando musica: ' + self.parent.song_to_search + ' no seeder com IP: ' + str(addr[0]) + ':' + str(addr[1]))
 				header = self.header_request(num_seq+1, len(self.parent.song_to_search))
 				data = self.parent.song_to_search.encode()
 				send_packet = header + data
-				print('Thread cliente mandando para: ', addr[0], ':', addr[1])
 				self.sk.sendto(send_packet, addr)
 
 				# data received from client 
 				recv_packet, addr = self.sk.recvfrom(self.max_pack_legth) 
-				print('Thread cliente recebendo de: ', addr[0], ':', addr[1])
 				# print(recv_packet.decode())
 				print(addr)
 				recv_header = recv_packet[:12]
@@ -118,39 +124,6 @@ class NodeServer():
 				self.event.set()
 			else:
 				print('Nada')
-			# # ask the client whether he wants to continue 
-			# ans = input('\nO que vc quer :\n1-Buscar musica\n2 - sair\n') 
-			# if ans == '1':
-			# 	song_name = input('\nDigita nome:\n') 
-			# 	### busca
-			# 	header = self.header_request(1, len(song_name))
-			# 	data = song_name.encode()
-			# 	send_packet = header + data
-			# 	print('Thread cliente mandando para: ', addr[0], ':', addr[1])
-			# 	self.sk.sendto(send_packet, addr)
-
-			# 	# data received from client 
-			# 	recv_packet, addr = self.sk.recvfrom(self.max_pack_legth) 
-			# 	print('Thread cliente recebendo de: ', addr[0], ':', addr[1])
-			# 	print(recv_packet.decode())
-			# 	print(addr)
-			# 	recv_header = recv_packet[:12]
-			# 	cmd, num_seq, size_data = struct.unpack('3sii', recv_header)
-			# 	if cmd == b'yes':
-			# 		ans = input('Deseja baixar:\n (y/n):\n')
-			# 		if ans == 'y':
-			# 			self.download()
-			# 	else:
-			# 		print('Nao tem')
-
-			# 	### baixa
-			# elif ans == '2':
-			# 	self.parent.on = False
-			# 	self.parent.quit()
-			# 	break
-
-
-        # connection closed 
 		self.sk.close()
 
 class Leecher():
@@ -205,12 +178,10 @@ class Leecher():
 			n_con += 1
 			s = SeederInfo(addr[0], addr[1])
 			self.list_seeders.append(s)
-			# messaga received from server 
-			# print the received message 
-			# here it would be a reverse of sent message 
-			print('Conexao n:', n_con)
+			logging.info('Conexao com seeder de numero: ' + str(n_con))
 			num = random.randint(49152, 65534)
 			n = NodeServer(self, ("", num))
+			logging.info('Atendendo seeder: ' + str(n_con) + ' na porta: ' + str(num))
 			self.list_threads.append(n)
 			start_new_thread(n.thread_client, (self.event, packet, addr)) 
 
@@ -278,18 +249,30 @@ class Leecher():
 
 	def do_download(self, size_data, n_seeders):
 		part = size_data/n_seeders
+		print('Tamanho da parte: ', part)
 		i = 0
 		for n in self.list_threads:
 			n.search_song_op = False
 			if n.has_song:
 				n.init = part*i
-				n.end = part*(i+1)-1
+				n.end = part*(i+1)
+				print('seeder: ', i)
+				print("Comeco: ", n.init, " Fim: ", n.end)
+			i += 1
 
 		self.event.set()
+		time.sleep(0.5)
 		for n in self.list_threads:
 			if n.has_song:
 				n.event.wait()
 		self.event.clear()
+		data = b''
+		for n in self.list_threads:
+			data = data + n.data
+		
+		f = open(str(datetime.now().hour) + "-novo-"+ str(datetime.now().minute) + ".wav", "w+b")
+		f.write(data)
+		f.close()
 		pass
 
 	def search_song(self, song_name):
@@ -320,8 +303,8 @@ class Leecher():
 		# mensagem com codigo para encontrar aplicacao
 		self.cli_socket.sendto(self.APP_KEY.encode(),
 					(self.ip_broadcast, port))
-		print('Endereco de Broadcast: ', self.ip_broadcast)
-		print('Broadcast enviado na porta: ', self.port)
+		logging.info('Endereco de Broadcast: ' + self.ip_broadcast)
+		logging.info('Broadcast enviado na porta: ' + str(self.port))
 
 		# thread para escutar devolucoes desse broadcast
 		start_new_thread(self.listen, ()) 
@@ -358,7 +341,26 @@ class Leecher():
 			print(self.list_seeders)
 			print(self.list_threads)
 		
+def setup_logging():
+	format = "%(asctime)s: %(message)s"
+	logging.basicConfig(filename='leecher.log',
+						format=format, 
+						level=logging.INFO,
+						datefmt="%m%d %H:%M:%S")
+    # define a Handler which writes INFO messages or higher to the sys.stderr
+	console = logging.StreamHandler()
+	console.setLevel(logging.INFO)
+	# set a format which is simpler for console use
+	formatter = logging.Formatter('%(asctime)s: %(name)-12s - %(levelname)-8s %(message)s')
+	# tell the handler to use this format
+	console.setFormatter(formatter)
+	# add the handler to the root logger
+	logging.getLogger('').addHandler(console)
 
 if __name__ == '__main__': 
+
+	setup_logging()
+
+	logging.info('Iniciando servicos do leecher')
 	leecher = Leecher()
 	leecher.main()

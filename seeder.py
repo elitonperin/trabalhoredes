@@ -1,14 +1,22 @@
+# modulo para conexao
 import socket 
+
+# modulo para audio
+import pyaudio
+import wave
+
+# modulo para utilidades
 import time
 import os
 import stat
 import argparse
-import pyaudio
-import wave
 import struct
 import sys
 import random
-from NodeSocket import NodeSocket
+import logging
+from datetime import datetime
+
+# modulo para threads
 from _thread import *
 import threading 
 
@@ -22,8 +30,8 @@ class NodeServer():
         self.addr = addr
         self.transmission_opt = 'rand'
         self.transmission_opt = 'srand'
-        self.transmission_opt = 'simple'
         self.transmission_opt = 'seq'
+        self.transmission_opt = 'simple'
         self.sk = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sk.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST,1)
         self.sk.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -58,9 +66,15 @@ class NodeServer():
         pass
         
     def normal_transmission(self, init, end, cmd, num_seq, data, size_data, addr):
-        i = init
-        while i*self.parent.data_size < end:
-            send_header = struct.pack('3siiii', cmd, num_seq+1, size_data, init, end)
+        size_data_send = self.parent.data_size
+        i = int(init/size_data_send)
+        print(len(data))
+        print('size data: ', size_data_send)
+        print('Comecanco com: ', i, ' ', i*size_data_send, ' ', init, 'fim: ', end)
+        num_pack = end/size_data_send
+        print('npack: ', num_pack)
+        while i < num_pack:
+            send_header = struct.pack('3siiii', cmd, num_seq+1, size_data_send, init, end)
             time.sleep(0.02)
             send_packet = send_header + data[i]
             self.sk.sendto(send_packet, addr)
@@ -70,6 +84,7 @@ class NodeServer():
             cmd, num_seq, size_data, init, end = struct.unpack('3siiii', recv_header)
             recv_data = recv_packet[20:]
             song_name = recv_data.decode()
+        print('Final: ', i, ' ', size_data_send*(i-1), ' ', end)
 
     def send_file(self, cmd, addr, recv_packet):
         
@@ -79,8 +94,11 @@ class NodeServer():
         song_name = recv_data.decode()
         finish = False
         self.parent.header_size = 20
-        data, num_of_packs, size = self.parent.split_files(song_name)
-
+        data, num_of_packs, size_data = self.parent.split_files(song_name)        
+        print(len(data))
+        print(num_of_packs)
+        if num_of_packs - int(num_of_packs) > 0:
+            num_of_packs = num_of_packs + 1
         if self.transmission_opt == 'seq':
             self.sequencial_transmission(init, end, cmd, num_seq, data, size_data, addr)
         elif self.transmission_opt == 'rand':
@@ -295,17 +313,36 @@ class Seeder():
         pass
 
     def quit(self):
-        print("Fechando servidor")
+        logging.info('Fechando servidor')
         self.serv_socket.close()
         exit()
 
+def setup_logging():
+    format = "%(asctime)s: '%(name)s - %(levelname)s - %(message)s'"
+    logging.basicConfig(filename='seeder.log',
+                        format=format, 
+                        level=logging.INFO,
+                        datefmt="%m%d %H:%M:%S")
+    # define a Handler which writes INFO messages or higher to the sys.stderr
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    # set a format which is simpler for console use
+    formatter = logging.Formatter('%(asctime)s: %(name)-12s - %(levelname)-8s %(message)s')
+    # tell the handler to use this format
+    console.setFormatter(formatter)
+    # add the handler to the root logger
+    logging.getLogger('').addHandler(console)
+
 if __name__ == "__main__":
+
+    setup_logging()
+
     parser = argparse.ArgumentParser(description="testing btpeer.py")
     parser.add_argument("--port", type=int)
     parser.add_argument("--host", type=str)
     parser.add_argument("--path", type=str)
     args = parser.parse_args()
-
+    logging.info('Iniciando servicos do seeder')
     server = Seeder(args=args)
     
     server.run_server()

@@ -51,15 +51,15 @@ class NodeServer():
 		header = struct.pack('3sii', b'req', num_seq, size_data)
 		return header
 	
-	def header_download(self, num_seq, size_data, init, end):
-		header = struct.pack('3siiii', b'dow', num_seq, size_data, init, end)
+	def header_download(self, pos_pack, num_seq, size_data, init, end):
+		header = struct.pack('3siiiii', b'dow', pos_pack, num_seq, size_data, init, end)
 		return header
 
 	def download(self, num_seq, song_name, addr):
-		finish = False
-		file_ = []
-		
-		send_header = self.header_download(num_seq+1, len(song_name), int(self.init), int(self.end))
+		data_ = []
+		header_size = 24
+		pos_pack = -1
+		send_header = self.header_download(num_seq+1, pos_pack, len(song_name), int(self.init), int(self.end))
 		send_data = song_name.encode()
 		send_packet = send_header + send_data
 		# print('Thread cliente mandando para: ', addr[0], ':', addr[1])
@@ -68,26 +68,26 @@ class NodeServer():
 		# data received from client 
 		recv_packet, addr = self.sk.recvfrom(self.max_pack_legth) 
 		# print('Thread cliente recebendo de: ', addr[0], ':', addr[1])
-		recv_header = recv_packet[:20]
-		cmd, num_seq, size_data, init, end = struct.unpack('3siiii', recv_header)
+		recv_header = recv_packet[:header_size]
+		cmd, pos_pack, num_seq, size_data, init, end = struct.unpack('3siiiii', recv_header)
 		i = int(self.init/size_data)
-		file_.append(recv_packet[20:])
+		data_.append(recv_packet[header_size:])
 		
 		while i*size_data < self.end:
-			send_header = self.header_download(num_seq+1, len(song_name), int(self.init), int(self.end))
+			send_header = self.header_download(num_seq+1, pos_pack, len(song_name), int(self.init), int(self.end))
 			send_data = song_name.encode()
 			send_packet = send_header + send_data
 			self.sk.sendto(send_packet, addr)
 			# data received from client 
 			recv_packet, addr = self.sk.recvfrom(self.max_pack_legth) 
-			recv_header = recv_packet[:20]
-			cmd, num_seq, size_data, init, end = struct.unpack('3siiii', recv_header)
+			recv_header = recv_packet[:header_size]
+			cmd, pos_pack, num_seq, size_data, init, end = struct.unpack('3siiiii', recv_header)
 			if cmd != b'fin':
-				recv_data = recv_packet[20:]
-				file_.append(recv_data)
+				recv_data = recv_packet[header_size:]
+				data_.append(recv_data)
 			else:
 				i = self.end + 1
-		data = b''.join(file_)
+		data = b''.join(data_)
 		logging.info('Quantidade de dados de pacotes recebidos: ' + str(len(data)))
 	
 		return num_seq, data
@@ -114,14 +114,12 @@ class NodeServer():
 
 				# data received from client 
 				recv_packet, addr = self.sk.recvfrom(self.max_pack_legth) 
-				# print(recv_packet.decode())
-				print(addr)
 				recv_header = recv_packet[:12]
-				print(len(recv_packet))
 				cmd, num_seq, size_data = struct.unpack('3sii', recv_header)
 				data = struct.unpack('i', recv_packet[12:])
 				self.size_file = data[0]
 				self.event.set()
+				time.sleep(0.3)
 			else:
 				print('Nada')
 		self.sk.close()
@@ -157,9 +155,8 @@ class Leecher():
 	def get_my_local_ip(self):
 		s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		s.connect(("8.8.8.8", 80))
-
 		data_addr = s.getsockname()
-		print("IP local: ", data_addr[0])
+		logging.info('IP Local do leecher: ' + data_addr[0])
 		s.close()
 		return data_addr[0]
 
@@ -207,7 +204,6 @@ class Leecher():
 	def play_audio(self, data):
 
 		for i in range(0, len(data), self.chunk):
-			print(i)
 			self.stream.write(data[i:i+self.chunk])
 
 	def request_file(self):

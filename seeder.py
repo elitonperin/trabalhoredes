@@ -60,12 +60,14 @@ class NodeServer():
         pass
     
     def random_transmission(self, init, end, cmd, num_seq, data, size_data, addr):
+        numpy.random.exponential()
         pass
 
     def seq_random_transmission(self, init, end, cmd, num_seq, data, size_data, addr):
         pass
         
     def normal_transmission(self, init, end, cmd, num_seq, data, size_data, addr):
+        header_size = self.parent.header_size
         size_data_send = self.parent.data_size
         i = int(init/size_data_send)
         print(len(data))
@@ -74,26 +76,28 @@ class NodeServer():
         num_pack = end/size_data_send
         print('npack: ', num_pack)
         while i < num_pack:
-            send_header = struct.pack('3siiii', cmd, num_seq+1, size_data_send, init, end)
+            pos_pack = i
+            send_header = struct.pack('3siiiii', cmd, pos_pack, num_seq+1, size_data_send, init, end)
             time.sleep(0.02)
             send_packet = send_header + data[i]
             self.sk.sendto(send_packet, addr)
             i=i+1
             recv_packet, addr = self.sk.recvfrom(self.max_pack_legth)
-            recv_header = recv_packet[:20]
-            cmd, num_seq, size_data, init, end = struct.unpack('3siiii', recv_header)
-            recv_data = recv_packet[20:]
+            recv_header = recv_packet[:header_size]
+            cmd, pos_pack, num_seq, size_data, init, end = struct.unpack('3siiiii', recv_header)
+            recv_data = recv_packet[header_size:]
             song_name = recv_data.decode()
         print('Final: ', i, ' ', size_data_send*(i-1), ' ', end)
 
     def send_file(self, cmd, addr, recv_packet):
         
-        recv_header = recv_packet[:20]
-        cmd, num_seq, size_data, init, end = struct.unpack('3siiii', recv_header)
-        recv_data = recv_packet[20:]
+        self.parent.header_size = 24
+        header_size = self.parent.header_size
+        recv_header = recv_packet[:header_size]
+        cmd, pos_pack, num_seq, size_data, init, end = struct.unpack('3siiiii', recv_header)
+        recv_data = recv_packet[header_size:]
         song_name = recv_data.decode()
         finish = False
-        self.parent.header_size = 20
         data, num_of_packs, size_data = self.parent.split_files(song_name)        
         print(len(data))
         print(num_of_packs)
@@ -111,7 +115,7 @@ class NodeServer():
         pass
 
     def thread_server(self, addr, data): 
-        print('Thread servidor mandando para: ', addr[0], ':', addr[1])
+        logging.info('Thread se comunicanco com: ' + addr[0] + ':' + str(addr[1]))
         self.sk.sendto(data, addr)
         send_header = ''
         send_data = ''
@@ -121,7 +125,6 @@ class NodeServer():
             # data received from client 
             recv_packet, addr = self.sk.recvfrom(self.max_pack_legth) 
             print('Thread servidor recebendo de: ', addr[0], ':', addr[1])
-            # print('Mensagem: ', recv_packet.decode())
 
             recv_header = recv_packet[:12]
             recv_data = recv_packet[12:]
@@ -129,25 +132,27 @@ class NodeServer():
             cmd, num_seq, size_data = struct.unpack('3sii', recv_header)
             print(cmd)
             if cmd == b'ext':
-                print('Saindo')
+                logging.info('Fechando conexao')
                 self.parent.quit()
             elif cmd == b'req':
-                print('Sendo requisitado')
+                logging.info('Sendo requisitado')
                 has, size_file = self.parent.request_file(recv_data, size_data, addr)
                 if has:
+                    logging.info('Tenho o arquivo requisitado')
                     header = struct.pack('3sii', b'yes', num_seq+1, size_data)
                     data_send = struct.pack('i', size_file)
                 else:
+                    logging.info('Nao tenho o arquivo requisitado')
                     header = struct.pack('3sii', b'not', num_seq+1, size_data)
                     data_send = struct.pack('i', 0)
             elif cmd == b'dow':
-                print('Fazendo upload')
+                logging.info('Enviando arquivo')
                 self.send_file(cmd, addr, recv_packet)
                 header = struct.pack('3siiii', b'fin',  num_seq+1, size_data, 0, 0)
                 data_send = struct.pack('i', 0)
                 var_exit = False
             elif cmd == b'exi':
-                print('Saindo')
+                logging.info('Fechando conexao')
                 self.sk.close()
                 self.parent.quit()
             else:
@@ -193,7 +198,7 @@ class Seeder():
             self.host = host 
         
         self.addr = (self.host, self.port)
-        print('Meu endereco: ', self.addr) 
+        logging.info('Endereco do seeder: '+ self.addr[0] + ':' + str(self.port))
         self.serv_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.serv_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST,1)
         self.serv_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -213,7 +218,7 @@ class Seeder():
         s.connect(("8.8.8.8", 80))
 
         data_addr = s.getsockname()
-        print("IP local: ", data_addr[0])
+        logging.info('Endereco local do seeder: '+ data_addr[0])
         s.close()
         return data_addr[0]
 
@@ -266,19 +271,16 @@ class Seeder():
         while SERVER_ON: 
             packet, addr = self.serv_socket.recvfrom(self.max_pack_legth) 
             self.connect_count += 1
-            print('Conexao n:', self.connect_count)
-            print('Com endereco: ', addr[0], ':', addr[1]) 
+            logging.info('Conexao com o leecher numero: ' + str(self.connect_count) + ' no endereco: ' + str(addr[0]) + ':' + str(addr[1]))
             # Start a new thread and return its identifier 
             if packet.decode() == self.APP_KEY:
                 num = random.randint(49152, 65534)
                 n = NodeServer(self, ("", num))
+                logging.info('Atendendo o leecher numero: ' + str(self.connect_count) + ' no endereco: ' + str(n.addr[0]) + ':' + str(n.addr[1]))
                 self.nodes_of_connections.append(n)
                 start_new_thread(n.thread_server, (addr, packet)) 
         self.serv_socket.close()
     
-    def state1(self):
-        pass
-        
     def request_file(self, name, size_data, addr):
         print('Request file: ', name)
         song_name = name.decode()
@@ -290,27 +292,6 @@ class Seeder():
             return True, file_stats[stat.ST_SIZE]
         else:
             return False, None
-
-    def send_file(self, comando, addr, recv_packet):
-        recv_header = recv_packet[:14]
-        cmd, num_seq, size_data, init, end = struct.unpack('3siiii', recv_header)
-        recv_data = recv_packet[14:]
-        song_name = recv_data.decode()
-        print(song_name)
-        self.header_size = 14
-        data, num_of_packs, size = self.split_files(song_name)
-        msg = [num_of_packs, size]
-        print(data[0])
-        msg = struct.pack('fii', num_of_packs, size, self.data_size)
-        self.serv_socket.sendto(msg, addr)
-        
-        i = 0
-        while i < num_of_packs:
-            time.sleep(0.02)
-            self.serv_socket.sendto(data[i], addr)
-            i=i+1
-
-        pass
 
     def quit(self):
         logging.info('Fechando servidor')

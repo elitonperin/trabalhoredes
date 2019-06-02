@@ -30,8 +30,8 @@ class NodeServer():
         self.addr = addr
         self.transmission_opt = 'rand'
         self.transmission_opt = 'srand'
-        self.transmission_opt = 'seq'
         self.transmission_opt = 'simple'
+        self.transmission_opt = 'seq'
         self.sk = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sk.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST,1)
         self.sk.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -45,22 +45,62 @@ class NodeServer():
             print("Enderecos: ", addr[0], " : ", addr[1])
     
     def sequencial_transmission(self, init, end, cmd, num_seq, data, size_data, addr):
-        i = init
-        while i*self.parent.data_size < end:
-            send_header = struct.pack('3siiii', cmd, num_seq+1, size_data, init, end)
-            time.sleep(0.02)
+        header_size = self.parent.header_size
+        size_data_send = self.parent.data_size
+        i = int(init/size_data_send)
+        print(len(data))
+        print('size data: ', size_data_send)
+        print('Comecanco com: ', i, ' ', i*size_data_send, ' ', init, 'fim: ', end)
+        num_pack = end/size_data_send
+        print('npack: ', num_pack)
+        prob = 1-self.parent.R
+        logging.info("Probabilidade de nao enviar com: " + str(prob))
+        while i < num_pack:
+            if random.random() > prob:
+                packet_avaliable = True
+            else:
+                packet_avaliable = False
+            if packet_avaliable:
+                pos_pack = i
+                send_header = struct.pack('3siiiii', cmd, pos_pack, num_seq+1, size_data_send, init, end)
+                send_packet = send_header + data[i]
+                self.sk.sendto(send_packet, addr)
+                i=i+1
+                recv_packet, addr = self.sk.recvfrom(self.max_pack_legth)
+                recv_header = recv_packet[:header_size]
+                cmd, pos_pack, num_seq, size_data, init, end = struct.unpack('3siiiii', recv_header)
+                recv_data = recv_packet[header_size:]
+                song_name = recv_data.decode()
+            else:
+                time.sleep(0.02)
+        print('Final: ', i, ' ', size_data_send*(i-1), ' ', end)
+
+    
+    def random_transmission(self, init, end, cmd, num_seq, data, size_data, addr):
+        header_size = self.parent.header_size
+        size_data_send = self.parent.data_size
+        i = int(init/size_data_send)
+        send_counter = 0
+        print(len(data))
+        print('size data: ', size_data_send)
+        print('Comecanco com: ', i, ' ', i*size_data_send, ' ', init, 'fim: ', end)
+        num_pack = end/size_data_send
+        print('npack: ', num_pack)
+        prob = 1-self.parent.R
+        logging.info("Probabilidade de nao enviar com: " + str(prob))
+        while send_counter < num_pack:
+            pos_pack = i
+            send_header = struct.pack('3siiiii', cmd, pos_pack, num_seq+1, size_data_send, init, end)
             send_packet = send_header + data[i]
             self.sk.sendto(send_packet, addr)
             i=i+1
             recv_packet, addr = self.sk.recvfrom(self.max_pack_legth)
-            recv_header = recv_packet[:20]
-            cmd, num_seq, size_data, init, end = struct.unpack('3siiii', recv_header)
-            recv_data = recv_packet[20:]
+            recv_header = recv_packet[:header_size]
+            cmd, pos_pack, num_seq, size_data, init, end = struct.unpack('3siiiii', recv_header)
+            recv_data = recv_packet[header_size:]
             song_name = recv_data.decode()
-        pass
-    
-    def random_transmission(self, init, end, cmd, num_seq, data, size_data, addr):
-        numpy.random.exponential()
+        print('Final: ', i, ' ', size_data_send*(i-1), ' ', end)
+
         pass
 
     def seq_random_transmission(self, init, end, cmd, num_seq, data, size_data, addr):
@@ -170,7 +210,7 @@ class NodeServer():
 
 class Seeder():
     def __init__(self, host='127.0.0.1', 
-                 port=7001,
+                 port=65000,
                  sharead_path='.',
                  args=None):
         self.max_pack_legth = 1280
@@ -178,6 +218,7 @@ class Seeder():
         self.APP_KEY = 'APP_KEY'
         self.header_size = 4
         self.nodes_of_connections = []
+        self.R = 0.9
         
         if args.port is not None:
             self.port=args.port
@@ -303,7 +344,7 @@ def setup_logging():
     logging.basicConfig(filename='seeder.log',
                         format=format, 
                         level=logging.INFO,
-                        datefmt="%m%d %H:%M:%S")
+                        datefmt="%m/%d %H:%M:%S")
     # define a Handler which writes INFO messages or higher to the sys.stderr
     console = logging.StreamHandler()
     console.setLevel(logging.INFO)
@@ -323,9 +364,9 @@ if __name__ == "__main__":
     parser.add_argument("--host", type=str)
     parser.add_argument("--path", type=str)
     args = parser.parse_args()
+
     logging.info('Iniciando servicos do seeder')
-    server = Seeder(args=args)
-    
+    server = Seeder(args=args)    
     server.run_server()
 
     

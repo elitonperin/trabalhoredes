@@ -72,6 +72,7 @@ class NodeServer():
 		cmd, pos_pack, num_seq, size_data, init, end = struct.unpack('3siiiii', recv_header)
 		i = int(self.init/size_data)
 		data_.append(recv_packet[header_size:])
+		logging.info("Pacote n: " + str(pos_pack) + ' recebido.')
 		
 		while i*size_data < self.end:
 			send_header = self.header_download(num_seq+1, pos_pack, len(song_name), int(self.init), int(self.end))
@@ -82,6 +83,7 @@ class NodeServer():
 			recv_packet, addr = self.sk.recvfrom(self.max_pack_legth) 
 			recv_header = recv_packet[:header_size]
 			cmd, pos_pack, num_seq, size_data, init, end = struct.unpack('3siiiii', recv_header)
+			logging.info("Pacote n: " + str(pos_pack) + ' recebido.')
 			if cmd != b'fin':
 				recv_data = recv_packet[header_size:]
 				data_.append(recv_data)
@@ -126,7 +128,6 @@ class NodeServer():
 
 class Leecher():
 	def __init__(self, args=None):
-		self.port = 7001
 		self.ip_broadcast = self.my_mask_for_broadcast()
 		self.max_pack_length = 1280
 		self.list_seeders = []
@@ -156,7 +157,7 @@ class Leecher():
 		s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		s.connect(("8.8.8.8", 80))
 		data_addr = s.getsockname()
-		logging.info('IP Local do leecher: ' + data_addr[0])
+		logging.info('IP Local do leecher: ' + data_addr[0] + ":"+ str(data_addr[1]))
 		s.close()
 		return data_addr[0]
 
@@ -295,12 +296,14 @@ class Leecher():
 		else:
 			return True, count, info
 
-	def broadcast(self, port=7001):
+	def broadcast(self, port=65000):
 		# mensagem com codigo para encontrar aplicacao
 		self.cli_socket.sendto(self.APP_KEY.encode(),
 					(self.ip_broadcast, port))
+		ip, port = self.cli_socket.getsockname()
+		logging.info("Meu endereco e: " + ip + ":" + str(port))
 		logging.info('Endereco de Broadcast: ' + self.ip_broadcast)
-		logging.info('Broadcast enviado na porta: ' + str(self.port))
+		logging.info('Broadcast enviado na porta: ' + str(port))
 
 		# thread para escutar devolucoes desse broadcast
 		start_new_thread(self.listen, ()) 
@@ -342,7 +345,7 @@ def setup_logging():
 	logging.basicConfig(filename='leecher.log',
 						format=format, 
 						level=logging.INFO,
-						datefmt="%m%d %H:%M:%S")
+						datefmt="%m/%d %H:%M:%S")
     # define a Handler which writes INFO messages or higher to the sys.stderr
 	console = logging.StreamHandler()
 	console.setLevel(logging.INFO)

@@ -48,11 +48,11 @@ class NodeServer():
         logging.info("Sequenatial transmission")
         header_size = self.parent.header_size
         size_data_send = self.parent.data_size
-        i = int(init/size_data_send)
+        i = init
         print(len(data))
         print('size data: ', size_data_send)
         print('Comecanco com: ', i, ' ', i*size_data_send, ' ', init, 'fim: ', end)
-        num_pack = end/size_data_send
+        num_pack = end
         print('npack: ', num_pack)
         prob = 1-self.parent.R
         logging.info("Probabilidade de nao enviar com: " + str(prob))

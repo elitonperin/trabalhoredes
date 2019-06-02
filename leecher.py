@@ -75,7 +75,7 @@ class NodeServer():
         recv_header = recv_packet[:header_size]
         # print(recv_header.decode())
         cmd, pos_pack, num_seq, size_data, init, end = struct.unpack('3siiiii', recv_header)
-        print(size_data, self.init)
+        print(size_data, init, end, num_seq, pos_pack, cmd)
         i = int(self.init/size_data)
         data_.append(recv_packet[header_size:])
         logging.info("Pacote n: " + str(pos_pack) + ' recebido.')

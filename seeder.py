@@ -247,7 +247,7 @@ class Seeder():
 
     def get_files_for_share(self):
         caminhos = [os.path.join(self.sharead_path, nome) for nome in os.listdir(self.sharead_path)]
-        arquivos = [arq.split('\\')[-1] for arq in caminhos if os.path.isfile(arq)]
+        arquivos = [arq.split('\\')[-1].replace('./', '') for arq in caminhos if os.path.isfile(arq)]
         print(arquivos)
         return arquivos
 

@@ -45,6 +45,7 @@ class NodeServer():
             print("Enderecos: ", addr[0], " : ", addr[1])
     
     def sequencial_transmission(self, init, end, cmd, num_seq, data, size_data, addr):
+        logging.info("Sequenatial transmission")
         header_size = self.parent.header_size
         size_data_send = self.parent.data_size
         i = int(init/size_data_send)
@@ -63,6 +64,7 @@ class NodeServer():
             if packet_avaliable:
                 pos_pack = i
                 send_header = struct.pack('3siiiii', cmd, pos_pack, num_seq+1, size_data_send, init, end)
+                # print( unicode( send_header.decode(), 'utf-8'))
                 send_packet = send_header + data[i]
                 self.sk.sendto(send_packet, addr)
                 i=i+1
@@ -77,6 +79,7 @@ class NodeServer():
 
     
     def random_transmission(self, init, end, cmd, num_seq, data, size_data, addr):
+        logging.info("Random transmission")
         header_size = self.parent.header_size
         size_data_send = self.parent.data_size
         i = int(init/size_data_send)
@@ -141,8 +144,6 @@ class NodeServer():
         data, num_of_packs, size_data = self.parent.split_files(song_name)        
         print(len(data))
         print(num_of_packs)
-        if num_of_packs - int(num_of_packs) > 0:
-            num_of_packs = num_of_packs + 1
         if self.transmission_opt == 'seq':
             self.sequencial_transmission(init, end, cmd, num_seq, data, size_data, addr)
         elif self.transmission_opt == 'rand':
@@ -166,10 +167,10 @@ class NodeServer():
             recv_packet, addr = self.sk.recvfrom(self.max_pack_legth) 
             print('Thread servidor recebendo de: ', addr[0], ':', addr[1])
 
-            recv_header = recv_packet[:12]
-            recv_data = recv_packet[12:]
+            recv_header = recv_packet[:self.parent.header_size]
+            recv_data = recv_packet[self.parent.header_size:]
 
-            cmd, num_seq, size_data = struct.unpack('3sii', recv_header)
+            cmd, pos_pack, num_seq, size_data, init, end = struct.unpack('3siiiii', recv_header)
             print(cmd)
             if cmd == b'ext':
                 logging.info('Fechando conexao')
@@ -179,11 +180,15 @@ class NodeServer():
                 has, size_file = self.parent.request_file(recv_data, size_data, addr)
                 if has:
                     logging.info('Tenho o arquivo requisitado')
-                    header = struct.pack('3sii', b'yes', num_seq+1, size_data)
+                    num_of_packs = size_file / self.parent.data_size
+                    if num_of_packs - int(num_of_packs) > 0:
+                        num_of_packs = num_of_packs + 1
+                    end = int(num_of_packs)
+                    header = struct.pack('3siiiii', b'yes', pos_pack, num_seq+1, size_data, init, end)
                     data_send = struct.pack('i', size_file)
                 else:
                     logging.info('Nao tenho o arquivo requisitado')
-                    header = struct.pack('3sii', b'not', num_seq+1, size_data)
+                    header = struct.pack('3siiiii', b'not', num_seq+1, size_data)
                     data_send = struct.pack('i', 0)
             elif cmd == b'dow':
                 logging.info('Enviando arquivo')
@@ -216,9 +221,10 @@ class Seeder():
         self.max_pack_legth = 1280
         self.ext_files = ['wav', 'mp3']
         self.APP_KEY = 'APP_KEY'
-        self.header_size = 4
+        self.header_size = 24
         self.nodes_of_connections = []
         self.R = 0.9
+        self.data_size = self.max_pack_legth - self.header_size
         
         if args.port is not None:
             self.port=args.port
@@ -267,9 +273,11 @@ class Seeder():
     def split_files(self, name_file):
         #retorna o tamanho em bytes
         size = os.path.getsize(name_file)
-        self.data_size = self.max_pack_legth - self.header_size
-        num_of_packs = size/self.data_size
         data_vector = []
+        num_of_packs = size/self.data_size
+        if num_of_packs - int(num_of_packs) > 0:
+            num_of_packs = num_of_packs + 1
+        num_of_packs = int(num_of_packs)
         i = 0
         f = open(name_file, 'rb')
         while i < num_of_packs:

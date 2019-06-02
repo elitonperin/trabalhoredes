@@ -243,16 +243,17 @@ class Seeder():
         self.serv_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.serv_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST,1)
         self.serv_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.serv_socket.bind(self.addr) 
+        self.serv_socket.bind(('', port))
 
     def get_files_for_share(self):
         caminhos = [os.path.join(self.sharead_path, nome) for nome in os.listdir(self.sharead_path)]
         arquivos = [arq.split('\\')[-1] for arq in caminhos if os.path.isfile(arq)]
+        print(arquivos)
         return arquivos
 
     def get_only_music_files(self):
         files = self.get_files_for_share()
-        return [ music_file for music_file in files if music_file.split('.')[1] in self.ext_files ]
+        return [ music_file for music_file in files if music_file.split('.')[-1] in self.ext_files ]
 
     def get_my_local_ip(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -329,7 +330,6 @@ class Seeder():
         print(self.get_only_music_files())
         if song_name in self.get_only_music_files():
             file_stats = os.stat(os.path.join(self.sharead_path, song_name))
-            print('Tem, mandando info')
             return True, file_stats[stat.ST_SIZE]
         else:
             return False, None
@@ -366,7 +366,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     logging.info('Iniciando servicos do seeder')
-    server = Seeder(args=args)    
+    server = Seeder(args=args)
+    # server.get_files_for_share()
     server.run_server()
 
     

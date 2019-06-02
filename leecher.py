@@ -14,8 +14,8 @@ import logging
 from datetime import datetime
 
 #import audio module
-import pyaudio
-from pydub import AudioSegment
+# import pyaudio
+# from pydub import AudioSegment
 
 class SeederInfo():
     def __init__(self, ip, port):
@@ -139,7 +139,7 @@ class Leecher():
 		self.cli_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 		self.cli_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 		self.cli_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-		self.setup_player()
+		# self.setup_player()
 		pass
 
 	'''
@@ -300,10 +300,10 @@ class Leecher():
 		# mensagem com codigo para encontrar aplicacao
 		self.cli_socket.sendto(self.APP_KEY.encode(),
 					(self.ip_broadcast, port))
-		ip, port = self.cli_socket.getsockname()
-		logging.info("Meu endereco e: " + ip + ":" + str(port))
 		logging.info('Endereco de Broadcast: ' + self.ip_broadcast)
 		logging.info('Broadcast enviado na porta: ' + str(port))
+		ip, port = self.cli_socket.getsockname()
+		logging.info("Meu endereco e: " + ip + ":" + str(port))
 
 		# thread para escutar devolucoes desse broadcast
 		start_new_thread(self.listen, ()) 

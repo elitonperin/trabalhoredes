@@ -188,14 +188,14 @@ class NodeServer():
                     data_send = struct.pack('i', size_file)
                 else:
                     logging.info('Nao tenho o arquivo requisitado')
-                    header = struct.pack('3siiiii', b'not', num_seq+1, size_data)
+                    header = struct.pack('3siiiii', b'not', pos_pack, num_seq+1, size_data, init, end)
                     data_send = struct.pack('i', 0)
             elif cmd == b'dow':
                 logging.info('Enviando arquivo')
                 self.send_file(cmd, addr, recv_packet)
-                header = struct.pack('3siiii', b'fin',  num_seq+1, size_data, 0, 0)
+                header = struct.pack('3siiiii', b'fin', pos_pack, num_seq+1, size_data, 0, 0)
                 data_send = struct.pack('i', 0)
-                var_exit = False
+                logging.info('Arquivo enviado')
             elif cmd == b'exi':
                 logging.info('Fechando conexao')
                 self.sk.close()

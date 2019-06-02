@@ -59,6 +59,10 @@ class NodeServer():
         header = struct.pack('3siiiii', b'dow', pos_pack, num_seq, size_data, init, end)
         return header
 
+    def header_finish(self, pos_pack, num_seq, size_data, init, end):
+        header = struct.pack('3siiiii', b'flw', pos_pack, num_seq, size_data, init, end)
+        return header
+
     def download(self, num_seq, song_name, addr):
         data_ = []
         header_size = 24
@@ -76,11 +80,11 @@ class NodeServer():
         # print(recv_header.decode())
         cmd, pos_pack, num_seq, size_data, init, end = struct.unpack('3siiiii', recv_header)
         print(size_data, init, end, num_seq, pos_pack, cmd)
-        i = int(self.init/size_data)
+        i = self.init
         data_.append(recv_packet[header_size:])
         logging.info("Pacote n: " + str(pos_pack) + ' recebido.')
 
-        while i*size_data < self.end:
+        while i < self.end:
             send_header = self.header_download(num_seq+1, pos_pack, len(song_name), int(self.init), int(self.end))
             send_data = song_name.encode()
             send_packet = send_header + send_data
@@ -112,7 +116,6 @@ class NodeServer():
                 self.data = data
                 self.event.set()
                 time.sleep(0.3)
-                num_seq += 1
             elif self.search_song_op:
                 logging.info('Buscando musica: ' + self.parent.song_to_search + ' no seeder com IP: ' + str(addr[0]) + ':' + str(addr[1]))
                 header = self.header_request(num_seq+1, len(self.parent.song_to_search))
@@ -277,6 +280,7 @@ class Leecher():
         data = b''
         for n in self.list_threads:
             data = data + n.data
+            n.download_req = False
 
         f = open(str(datetime.now().hour) + "-novo-"+ str(datetime.now().minute) + ".wav", "w+b")
         f.write(data)
@@ -288,6 +292,7 @@ class Leecher():
         for n in self.list_threads:
             n.search_song_op = True
         self.event.set()
+        time.sleep(0.5)
         print('Esperando...')
         for n in self.list_threads:
             n.event.wait()
@@ -333,7 +338,6 @@ class Leecher():
             ans = input('\nO que vc quer :\n1-Buscar musica\n2 - sair\n')
             if ans == '1':
                 song_name = input('\nDigita nome:\n')
-                time.sleep(0.5)
                 s_ans, count, info = self.search_song(song_name)
                 if s_ans:
                     print('Arquivo encontrado em ', count, 'peers')
@@ -350,6 +354,9 @@ class Leecher():
                 self.quit()
             else:
                 print('Comando Invalido')
+            ans = False
+            s_ans = False
+            ans_d = False
             print(self.list_seeders)
         print(self.list_threads)
 

@@ -326,7 +326,7 @@ class Leecher():
 					print('Arquivo encontrado em ', count, 'peers')
 					print('Informacoes: ', info)
 					ans_d = input('Deseja fazer o download: (y/n) \n')
-					if ans_d=='y':
+					if ans_d.lower() == 'y':
 						for n in self.list_threads:
 							if n.has_song:
 								n.download_req = True

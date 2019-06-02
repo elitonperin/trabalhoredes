@@ -3,8 +3,11 @@ import sys
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import pyqtSlot
 from PyQt5.QtGui import QIcon
+from PyQt5.QtMultimedia import QSound
 from PyQt5.QtWidgets import QApplication, QWidget, QTableWidget, QTableWidgetItem, QVBoxLayout, QMessageBox, QLineEdit, \
     QPushButton, QLabel, QAction, QMainWindow, qApp
+
+from audioP import playFile
 
 EMPTY_STATE_MESSAGE = "No files :'("
 
@@ -74,11 +77,8 @@ class FormWidget(QWidget):
     def create_search_table(self, layout):
         # Create table
 
-
         self.tableSearchWidgetLabel = QLabel("Arquivos no server")
         self.tableSearchWidget = QTableWidget()
-
-
         self.tableSearchWidget.setRowCount(MAX_ROWS_TABLE)
         self.tableSearchWidget.setColumnCount(MAX_COLMUN_COUNT)
         self.tableSearchWidget.setItem(0, 0, QTableWidgetItem(EMPTY_STATE_MESSAGE))
@@ -86,6 +86,10 @@ class FormWidget(QWidget):
         self.tableSearchWidget.setHorizontalHeaderLabels(['File name', 'Actions'])
         # table selection change
         self.tableSearchWidget.doubleClicked.connect(self.on_click_search_table)
+
+        btn = QPushButton(self.tableSearchWidget)
+        btn.setText('Download')
+        self.tableSearchWidget.setCellWidget(0, 1, btn)
 
         #
         header = self.tableSearchWidget.horizontalHeader()
@@ -107,6 +111,11 @@ class FormWidget(QWidget):
         self.tableFileDownloadingWidget.setHorizontalHeaderLabels(['File name', 'Actions'])
         self.tableFileDownloadingWidget.doubleClicked.connect(self.on_click_search_table)
 
+        btn = QPushButton(self.tableFileDownloadingWidget)
+        btn.setText('Play')
+        btn.clicked.connect(self.play_sound)
+        self.tableFileDownloadingWidget.setCellWidget(0, 1, btn)
+
         #
         header = self.tableFileDownloadingWidget.horizontalHeader()
         header.setSectionResizeMode(0, QtWidgets.QHeaderView.Stretch)
@@ -126,6 +135,11 @@ class FormWidget(QWidget):
         print("\n")
         for currentQTableWidgetItem in self.tableSearchWidget.selectedItems():
             print(currentQTableWidgetItem.row(), currentQTableWidgetItem.column(), currentQTableWidgetItem.text())
+
+    # Greetings
+    def play_sound(self):
+        playFile('novo.wav')
+        print("Sound!")
 
 
 if __name__ == '__main__':

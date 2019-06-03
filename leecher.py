@@ -94,11 +94,13 @@ class NodeServer():
             recv_header = recv_packet[:header_size]
             cmd, pos_pack, num_seq, size_data, init, end = struct.unpack('3siiiii', recv_header)
             logging.info("Pacote n: " + str(pos_pack) + ' recebido.')
-            if cmd != b'fin':
+            if cmd == b'fin':
+                break
+            else:
+                i += 1
                 recv_data = recv_packet[header_size:]
                 data_.append(recv_data)
-            else:
-                i = self.end + 1
+
         data = b''.join(data_)
         logging.info('Quantidade de dados de pacotes recebidos: ' + str(len(data)))
 

@@ -75,6 +75,11 @@ class NodeServer():
                 song_name = recv_data.decode()
             else:
                 time.sleep(0.02)
+        send_header = struct.pack('3siiiii', b'fin', pos_pack, num_seq+1, size_data, 0, 0)
+        data_send = struct.pack('i', 0)
+        send_packet = send_header + data_send
+        self.sk.sendto(send_packet, addr)
+        logging.info('Arquivo enviado')
         print('Final: ', i, ' ', size_data_send*(i-1), ' ', end)
 
     
@@ -186,6 +191,11 @@ class NodeServer():
                     end = int(num_of_packs)
                     header = struct.pack('3siiiii', b'yes', pos_pack, num_seq+1, size_data, init, end)
                     data_send = struct.pack('i', size_file)
+                    send_packet = header + data_send
+                    # send back reversed string to client
+                    print('Thread servidor mandando para: ', addr[0], ':', addr[1])
+                    #print('Send packet with: ', send_packet.decode())
+                    self.sk.sendto(send_packet, addr)
                 else:
                     logging.info('Nao tenho o arquivo requisitado')
                     header = struct.pack('3siiiii', b'not', pos_pack, num_seq+1, size_data, init, end)
@@ -193,23 +203,20 @@ class NodeServer():
             elif cmd == b'dow':
                 logging.info('Enviando arquivo')
                 self.send_file(cmd, addr, recv_packet)
-                header = struct.pack('3siiiii', b'fin', pos_pack, num_seq+1, size_data, 0, 0)
-                data_send = struct.pack('i', 0)
-                logging.info('Arquivo enviado')
             elif cmd == b'exi':
                 logging.info('Fechando conexao')
                 self.sk.close()
                 self.parent.quit()
             else:
                 print('Comando Invalido!')
-            # self.sk.sendto(recv_packet, addr)
-            print(sys.getsizeof(header))
-            print(sys.getsizeof(data_send))
-            send_packet = header + data_send
-            # send back reversed string to client 
-            print('Thread servidor mandando para: ', addr[0], ':', addr[1])
-            #print('Send packet with: ', send_packet.decode())
-            self.sk.sendto(send_packet, addr) 
+            # # self.sk.sendto(recv_packet, addr)
+            # print(sys.getsizeof(header))
+            # print(sys.getsizeof(data_send))
+            # send_packet = header + data_send
+            # # send back reversed string to client
+            # print('Thread servidor mandando para: ', addr[0], ':', addr[1])
+            # #print('Send packet with: ', send_packet.decode())
+            # self.sk.sendto(send_packet, addr)
 
         # connection closed 
 

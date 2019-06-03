@@ -151,15 +151,15 @@ class Leecher():
     def __init__(self, file_list=[], args=None):
         self.ip_broadcast = self.my_mask_for_broadcast()
         print('iniciou')
-        self.max_pack_length = 160
+        self.max_pack_length = 320
         self.list_seeders = []
-        self.APP_KEY = 'APP_KEY'
+        self.APP_KEY = 'APP_KEY_1'
         self.on = True
         self.list_threads = []
         self.event = threading.Event()
         self.header_size = 24
         self.RTT = 0.005
-        self.F = 0.01
+        self.F = 0.1
 
         self.cli_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.cli_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

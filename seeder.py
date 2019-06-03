@@ -230,7 +230,7 @@ class Seeder():
                  args=None):
         self.max_pack_legth = 160
         self.ext_files = ['wav', 'mp3']
-        self.APP_KEY = 'APP_KEY'
+        self.APP_KEY = 'APP_KEY_1'
         self.header_size = 24
         self.nodes_of_connections = []
         self.R = 0.9

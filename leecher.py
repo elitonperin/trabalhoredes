@@ -107,10 +107,16 @@ class NodeServer():
         logging.info('Quantidade de dados de pacotes recebidos: ' + str(len(data)))
 
         return num_seq, data
+    def send_finish(self):
+        header = struct.pack('3siiiii', b'ext', 0, 0, 0, 0, 0)
+        data = '0'.encode()
+        send_packet = header + data
+        self.sk.sendto(send_packet, self.addr_seeder)
 
     def thread_client(self, event, data, addr):
         self.on = True
         num_seq = 0
+        self.addr_seeder = addr
         while self.on:
             event.wait()
             self.event.clear()
@@ -119,8 +125,8 @@ class NodeServer():
                 num_seq, data = self.download(num_seq, self.parent.song_to_search, addr)
                 self.data = data
                 print('Esperando para proximo comando.')
-                time.sleep(3)
                 self.event.set()
+                time.sleep(3)
             elif self.search_song_op:
                 logging.info('Buscando musica: ' + self.parent.song_to_search + ' no seeder com IP: ' + str(addr[0]) + ':' + str(addr[1]))
                 header = self.header_request(num_seq+1, len(self.parent.song_to_search))
@@ -183,6 +189,7 @@ class Leecher():
     def quit(self):
         for soc in self.list_threads:
             soc.on = False
+            soc.send_finish()
             soc.sk.close()
         self.cli_socket.close()
         exit()
@@ -284,6 +291,7 @@ class Leecher():
             if n.has_song:
                 n.event.wait()
         self.event.clear()
+        time.sleep(3)
         data = b''
         for n in self.list_threads:
             data = data + n.data

@@ -195,6 +195,7 @@ class NodeServer():
             print(cmd)
             if cmd == b'ext':
                 logging.info('Fechando conexao')
+                self.sk.close()
                 self.parent.quit()
             elif cmd == b'req':
                 logging.info('Sendo requisitado')

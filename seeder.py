@@ -30,19 +30,18 @@ class NodeServer():
         self.addr = addr
         self.transmission_opt = 'srand'
         self.transmission_opt = 'simple'
-        self.transmission_opt = 'rand'
         self.transmission_opt = 'seq'
+        self.transmission_opt = 'rand'
         self.sk = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sk.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST,1)
         self.sk.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         if addr is not None:
-            self.sk.bind(self.addr) 
-            print("Criado novo socket UDP")
-            print("Enderecos: ", addr[0], " : ", addr[1])
+            self.sk.bind(self.addr)             
         else:
             self.sk.bind(('', 0))
             addr = self.sk.getsockname()
-            print("Enderecos: ", addr[0], " : ", addr[1])
+        logging.info("Criado novo socket UDP")
+        logging.info("Enderecos: " + addr[0] + " : " + str(addr[1]))
     
     def sequencial_transmission(self, init, end, cmd, num_seq, data, size_data, addr):
         logging.info("Sequential transmission")
@@ -50,11 +49,7 @@ class NodeServer():
         size_data_send = self.parent.data_size
         i = init
         num_seq_send = num_seq
-        print(len(data))
-        print('size data: ', size_data_send)
-        print('Comecanco com: ', i, ' ', init, 'fim: ', end)
         num_pack = end
-        print('npack: ', num_pack)
         prob = 1-self.parent.R
         logging.info("Probabilidade de nao enviar com: " + str(prob))
         while i < num_pack:
@@ -74,6 +69,8 @@ class NodeServer():
                 if num_seq != num_seq_send:
                     i=i+1
                     num_seq_send = num_seq
+                else:
+                    logging.warn("Pacote n: "+ str(pos_pack) + ' PERDIDO!')
                 recv_data = recv_packet[header_size:]
                 song_name = recv_data.decode()
             else:
@@ -83,7 +80,6 @@ class NodeServer():
         send_packet = send_header + data_send
         self.sk.sendto(send_packet, addr)
         logging.info('Arquivo enviado')
-        print('Final: ', i, ' ', size_data_send*(i-1), ' ', end)
 
     
     def random_transmission(self, init, end, cmd, num_seq, data, size_data, addr):
@@ -91,11 +87,7 @@ class NodeServer():
         header_size = self.parent.header_size
         size_data_send = self.parent.data_size
         i = init
-        print(len(data))
-        print('size data: ', size_data_send)
-        print('Comecanco com: ', i, ' ', i*size_data_send, ' ', init, 'fim: ', end)
         num_pack = end
-        print('npack: ', num_pack)
         list_packs = list(range(init, end))
         list_choice = []
         num_seq_sender = num_seq
@@ -111,11 +103,9 @@ class NodeServer():
             cmd, pos_pack, num_seq, size_data, init, end = struct.unpack('3siiiii', recv_header)
             if num_seq != num_seq_sender:
                 i=i+1
-                print(i, choice, num_seq_sender, num_seq)
                 num_seq_sender = num_seq
             else:
-                print('Ihhhh')
-                print(pos_pack, choice, num_seq)
+                logging.warn("Pacote n: "+ str(choice) + ' PERDIDO!')
                 list_packs.append(choice)
                 list_choice.remove(choice)
             recv_data = recv_packet[header_size:]
@@ -192,7 +182,6 @@ class NodeServer():
             recv_data = recv_packet[self.parent.header_size:]
 
             cmd, pos_pack, num_seq, size_data, init, end = struct.unpack('3siiiii', recv_header)
-            print(cmd)
             if cmd == b'ext':
                 logging.info('Fechando conexao')
                 self.sk.close()
@@ -210,7 +199,7 @@ class NodeServer():
                     data_send = struct.pack('i', size_file)
                     send_packet = header + data_send
                     # send back reversed string to client
-                    print('Thread servidor mandando para: ', addr[0], ':', addr[1])
+                    # print('Thread servidor mandando para: ', addr[0], ':', addr[1])
                     #print('Send packet with: ', send_packet.decode())
                     self.sk.sendto(send_packet, addr)
                 else:
@@ -219,7 +208,7 @@ class NodeServer():
                     data_send = struct.pack('i', 0)
                     send_packet = header + data_send
                     # send back reversed string to client
-                    print('Thread servidor mandando para: ', addr[0], ':', addr[1])
+                    # print('Thread servidor mandando para: ', addr[0], ':', addr[1])
                     #print('Send packet with: ', send_packet.decode())
                     self.sk.sendto(send_packet, addr)
             elif cmd == b'dow':
@@ -231,14 +220,6 @@ class NodeServer():
                 self.parent.quit()
             else:
                 print('Comando Invalido!')
-            # # self.sk.sendto(recv_packet, addr)
-            # print(sys.getsizeof(header))
-            # print(sys.getsizeof(data_send))
-            # send_packet = header + data_send
-            # # send back reversed string to client
-            # print('Thread servidor mandando para: ', addr[0], ':', addr[1])
-            # #print('Send packet with: ', send_packet.decode())
-            # self.sk.sendto(send_packet, addr)
 
         # connection closed 
 
@@ -247,7 +228,7 @@ class Seeder():
                  port=65000,
                  sharead_path='.',
                  args=None):
-        self.max_pack_legth = 1280
+        self.max_pack_legth = 160
         self.ext_files = ['wav', 'mp3']
         self.APP_KEY = 'APP_KEY'
         self.header_size = 24
@@ -361,10 +342,7 @@ class Seeder():
         self.serv_socket.close()
     
     def request_file(self, name, size_data, addr):
-        print('Request file: ', name)
         song_name = name.decode()
-        print(song_name)
-        print(self.get_only_music_files())
         if song_name in self.get_only_music_files():
             file_stats = os.stat(os.path.join(self.sharead_path, song_name))
             return True, file_stats[stat.ST_SIZE]
@@ -406,27 +384,5 @@ if __name__ == "__main__":
     server = Seeder(args=args)
     # server.get_files_for_share()
     server.run_server()
-
-    
-    # a forever loop until client wants to exit 
-    # while True: 
-
-    #     # lock acquired by client 
-    #     # print_lock.acquire() 
-    #     packet, addr = server.serv_socket.recvfrom(server.max_pack_legth)
-    #     cmd, n_seq, init_segm, final_segm, ack, nack, data = struct.unpack('3s i i i i i s', packet)
-    #     print('Primeira conexao :', addr[0], ':', addr[1]) 
-    #     print(cmd, data)
-    #     # Start a new thread and return its identifier
-
-    #     if cmd == "new":
-    #         num = random.randint(49152, 65534)
-    #         n = NodeSocket(server, ("", num))
-    #         start_new_thread(n.thread_server, (addr,packet)) 
-    # server.serv_socket.close() 
-    
-    # print(server.get_only_music_files())
-    # server.split_files(server.get_only_music_files()[0])
-
     
     exit()

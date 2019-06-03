@@ -100,7 +100,9 @@ class NodeServer():
                         data_recvds.append(pos_pack)
                     i += 1
             else:
-                print('Perdeu!')
+                recv_header = recv_packet[:header_size]
+                _, pos_pack_lost, _, _, _, _ = struct.unpack('3siiiii', recv_header)
+                logging.warn("Pacote n: "+ str(pos_pack_lost) + ' PERDIDO!')
         if is_rand:
             data_ = [x for _, x in sorted(zip(data_recvds, data_))]
         data = b''.join(data_)
@@ -127,7 +129,7 @@ class NodeServer():
                 self.data = data
                 print('Esperando para proximo comando.')
                 self.event.set()
-                time.sleep(3)
+                time.sleep(15)
             elif self.search_song_op:
                 logging.info(
                     'Buscando musica: ' + self.parent.song_to_search + ' no seeder com IP: ' + str(addr[0]) + ':' + str(
@@ -156,7 +158,7 @@ class Leecher():
     def __init__(self, file_list=[], args=None):
         self.ip_broadcast = self.my_mask_for_broadcast()
         print('iniciou')
-        self.max_pack_length = 1280
+        self.max_pack_length = 160
         self.list_seeders = []
         self.APP_KEY = 'APP_KEY'
         self.on = True
@@ -305,7 +307,7 @@ class Leecher():
             if n.has_song:
                 n.event.wait()
         self.event.clear()
-        time.sleep(3)
+        time.sleep(15)
         data = b''
         for n in self.list_threads:
             data = data + n.data

@@ -153,7 +153,7 @@ class NodeServer():
 
 
 class Leecher():
-    def __init__(self, file_list=None, args=None):
+    def __init__(self, file_list=[], args=None):
         self.ip_broadcast = self.my_mask_for_broadcast()
         print('iniciou')
         self.max_pack_length = 1280
@@ -280,6 +280,11 @@ class Leecher():
         self.cli_socket.close()
 
     def do_download(self, size_data, n_seeders):
+
+        if self.setup_update_table is not None:
+            self.file_list.append('Downloading')
+            self.setup_update_table(len(self.file_list))
+
         part = self.end / n_seeders
         print('Tamanho da parte: ', part)
         i = 0
@@ -308,8 +313,10 @@ class Leecher():
 
         fileName = str(datetime.now().hour) + "-novo-" + str(datetime.now().minute) + ".wav"
 
-        self.file_list.append(fileName)
-        self.setup_update_table(len(self.file_list))
+        if self.setup_update_table is not None:
+            self.file_list.pop()
+            self.file_list.append('Downloading')
+            self.setup_update_table(len(self.file_list))
 
         f = open(fileName, "w+b")
         f.write(data)
@@ -389,6 +396,10 @@ class Leecher():
             ans_d = False
             print(self.list_seeders)
         print(self.list_threads)
+
+    def have_file(self, file_name):
+        s_ans, count, info = self.search_song(file_name)
+        return s_ans
 
     def search_file_fron_gui(self, file_name):
         s_ans, count, info = self.search_song(file_name)

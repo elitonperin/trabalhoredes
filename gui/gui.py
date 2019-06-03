@@ -27,13 +27,14 @@ class App(QMainWindow):
 
     def __init__(self, leecher, parent=None):
         super(App, self).__init__(parent)
+        self.name = 'P2P audio streamer :D :D :D'
         self.form_widget = FormWidget(self)
         self.create_toolbar()
         self.setCentralWidget(self.form_widget)
         self.setGeometry(200, 100, 800, 600)
         self.leecher = leecher
         self.leecher.setup_update_table = self.form_widget.update_table_item
-        start_new_thread(self.leecher.broadcast, ())
+        # start_new_thread(self.leecher.broadcast, ())
 
     def create_toolbar(self):
         exitAct = QAction(QIcon.fromTheme('exit'), 'Exit', self)
@@ -100,11 +101,19 @@ class FormWidget(QWidget):
     @pyqtSlot()
     def on_click_search(self):
         textboxValue = self.textbox.text()
-        start_new_thread(self.parent().leecher.search_file_fron_gui, (textboxValue,))
-        QMessageBox.question(self, 'Busca', "We are going to download: " + textboxValue, QMessageBox.Ok,
-                             QMessageBox.Ok)
-        self.textbox.setText("")
-        print(file_list)
+
+        if self.parent().leecher.have_file(textboxValue):
+            reply = QMessageBox.question(self, 'Busca', "We are going to download: " + textboxValue, QMessageBox.Ok | QMessageBox.Cancel,
+                                            QMessageBox.Cancel)
+            if reply == QMessageBox.Ok:
+                start_new_thread(self.parent().leecher.search_file_fron_gui, (textboxValue,))
+                self.textbox.setText("")
+                return
+
+            self.textbox.setText("")
+        else:
+            QMessageBox.question(self, ':(', "File not found: " + textboxValue, QMessageBox.Ok,
+                                 QMessageBox.Ok)
 
     @pyqtSlot()
     def on_click_downloading_table(self):
@@ -125,5 +134,6 @@ if __name__ == '__main__':
 
     app = QApplication(sys.argv)
     ex = App(leecher=leecher)
+    ex.setWindowTitle("P2P Audio Streamer")
     ex.show()
     sys.exit(app.exec_())

@@ -28,9 +28,9 @@ class NodeServer():
         self.parent = parent
         self.max_pack_legth = 1280
         self.addr = addr
-        self.transmission_opt = 'rand'
         self.transmission_opt = 'srand'
         self.transmission_opt = 'simple'
+        self.transmission_opt = 'rand'
         self.transmission_opt = 'seq'
         self.sk = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sk.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST,1)
@@ -45,13 +45,14 @@ class NodeServer():
             print("Enderecos: ", addr[0], " : ", addr[1])
     
     def sequencial_transmission(self, init, end, cmd, num_seq, data, size_data, addr):
-        logging.info("Sequenatial transmission")
+        logging.info("Sequential transmission")
         header_size = self.parent.header_size
         size_data_send = self.parent.data_size
         i = init
+        num_seq_send = num_seq
         print(len(data))
         print('size data: ', size_data_send)
-        print('Comecanco com: ', i, ' ', i*size_data_send, ' ', init, 'fim: ', end)
+        print('Comecanco com: ', i, ' ', init, 'fim: ', end)
         num_pack = end
         print('npack: ', num_pack)
         prob = 1-self.parent.R
@@ -63,14 +64,16 @@ class NodeServer():
                 packet_avaliable = False
             if packet_avaliable:
                 pos_pack = i
-                send_header = struct.pack('3siiiii', cmd, pos_pack, num_seq+1, size_data_send, init, end)
+                send_header = struct.pack('3siiiii', cmd, pos_pack, num_seq_send+1, size_data_send, init, end)
                 # print( unicode( send_header.decode(), 'utf-8'))
                 send_packet = send_header + data[i]
                 self.sk.sendto(send_packet, addr)
-                i=i+1
                 recv_packet, addr = self.sk.recvfrom(self.max_pack_legth)
                 recv_header = recv_packet[:header_size]
                 cmd, pos_pack, num_seq, size_data, init, end = struct.unpack('3siiiii', recv_header)
+                if num_seq != num_seq_send:
+                    i=i+1
+                    num_seq_send = num_seq
                 recv_data = recv_packet[header_size:]
                 song_name = recv_data.decode()
             else:
@@ -87,29 +90,42 @@ class NodeServer():
         logging.info("Random transmission")
         header_size = self.parent.header_size
         size_data_send = self.parent.data_size
-        i = int(init/size_data_send)
-        send_counter = 0
+        i = init
         print(len(data))
         print('size data: ', size_data_send)
         print('Comecanco com: ', i, ' ', i*size_data_send, ' ', init, 'fim: ', end)
-        num_pack = end/size_data_send
+        num_pack = end
         print('npack: ', num_pack)
-        prob = 1-self.parent.R
-        logging.info("Probabilidade de nao enviar com: " + str(prob))
-        while send_counter < num_pack:
-            pos_pack = i
-            send_header = struct.pack('3siiiii', cmd, pos_pack, num_seq+1, size_data_send, init, end)
-            send_packet = send_header + data[i]
+        list_packs = list(range(init, end))
+        list_choice = []
+        num_seq_sender = num_seq
+        while i < num_pack:
+            choice = random.choice(list_packs)
+            list_packs.remove(choice)
+            list_choice.append(choice)
+            send_header = struct.pack('3siiiii', b'rnd', choice, num_seq_sender+1, size_data_send, init, end)
+            send_packet = send_header + data[choice]
             self.sk.sendto(send_packet, addr)
-            i=i+1
             recv_packet, addr = self.sk.recvfrom(self.max_pack_legth)
             recv_header = recv_packet[:header_size]
             cmd, pos_pack, num_seq, size_data, init, end = struct.unpack('3siiiii', recv_header)
+            if num_seq != num_seq_sender:
+                i=i+1
+                print(i, choice, num_seq_sender, num_seq)
+                num_seq_sender = num_seq
+            else:
+                print('Ihhhh')
+                print(pos_pack, choice, num_seq)
+                list_packs.append(choice)
+                list_choice.remove(choice)
             recv_data = recv_packet[header_size:]
             song_name = recv_data.decode()
+        send_header = struct.pack('3siiiii', b'fin', pos_pack, num_seq+1, size_data, 0, 0)
+        data_send = struct.pack('i', 0)
+        send_packet = send_header + data_send
+        self.sk.sendto(send_packet, addr)
+        logging.info('Arquivo enviado')
         print('Final: ', i, ' ', size_data_send*(i-1), ' ', end)
-
-        pass
 
     def seq_random_transmission(self, init, end, cmd, num_seq, data, size_data, addr):
         pass
@@ -200,6 +216,11 @@ class NodeServer():
                     logging.info('Nao tenho o arquivo requisitado')
                     header = struct.pack('3siiiii', b'not', pos_pack, num_seq+1, size_data, init, end)
                     data_send = struct.pack('i', 0)
+                    send_packet = header + data_send
+                    # send back reversed string to client
+                    print('Thread servidor mandando para: ', addr[0], ':', addr[1])
+                    #print('Send packet with: ', send_packet.decode())
+                    self.sk.sendto(send_packet, addr)
             elif cmd == b'dow':
                 logging.info('Enviando arquivo')
                 self.send_file(cmd, addr, recv_packet)

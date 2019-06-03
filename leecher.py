@@ -67,40 +67,42 @@ class NodeServer():
         data_ = []
         header_size = 24
         pos_pack = -1
-        send_header = self.header_download(num_seq+1, pos_pack, len(song_name), int(self.init), int(self.end))
-        send_data = song_name.encode()
-        send_packet = send_header + send_data
-        # print('Thread cliente mandando para: ', addr[0], ':', addr[1])
-        self.sk.sendto(send_packet, addr)
-
-        # data received from client
-        recv_packet, addr = self.sk.recvfrom(self.max_pack_legth)
-        # print('Thread cliente recebendo de: ', addr[0], ':', addr[1])
-        recv_header = recv_packet[:header_size]
-        # print(recv_header.decode())
-        cmd, pos_pack, num_seq, size_data, init, end = struct.unpack('3siiiii', recv_header)
-        print(size_data, init, end, num_seq, pos_pack, cmd)
         i = self.init
-        data_.append(recv_packet[header_size:])
-        logging.info("Pacote n: " + str(pos_pack) + ' recebido.')
-
+        data_recvds = []
+        timer_list = []
+        is_rand = False
+        
         while i < self.end:
-            send_header = self.header_download(num_seq+1, pos_pack, len(song_name), int(self.init), int(self.end))
+            send_header = self.header_download(pos_pack, num_seq+1, len(song_name), int(self.init), int(self.end))
             send_data = song_name.encode()
             send_packet = send_header + send_data
             self.sk.sendto(send_packet, addr)
-            # data received from client
-            recv_packet, addr = self.sk.recvfrom(self.max_pack_legth)
-            recv_header = recv_packet[:header_size]
-            cmd, pos_pack, num_seq, size_data, init, end = struct.unpack('3siiiii', recv_header)
-            logging.info("Pacote n: " + str(pos_pack) + ' recebido.')
-            if cmd == b'fin':
-                break
-            else:
-                i += 1
-                recv_data = recv_packet[header_size:]
-                data_.append(recv_data)
 
+
+            # data received from client
+            t0 = time.time()
+            recv_packet, addr = self.sk.recvfrom(self.max_pack_legth)
+            t = time.time() - t0
+            t = t + self.parent.RTT/2 + numpy.random.exponential()/10
+            timer_list.append(t)
+            time.sleep(t)
+            if random.random() > self.parent.F:
+                recv_header = recv_packet[:header_size]
+                cmd, pos_pack, num_seq, size_data, init, end = struct.unpack('3siiiii', recv_header)
+                logging.info("Pacote n: " + str(pos_pack) + ' recebido.')
+                if cmd == b'fin':
+                    break
+                else:
+                    recv_data = recv_packet[header_size:]
+                    data_.append(recv_data)
+                    if cmd == b'rnd':
+                        is_rand = True
+                        data_recvds.append(pos_pack)
+                    i += 1  
+            else:
+                print('Perdeu!')        
+        if is_rand:
+            data_ = [x for _, x in sorted(zip(data_recvds , data_))]
         data = b''.join(data_)
         logging.info('Quantidade de dados de pacotes recebidos: ' + str(len(data)))
 
@@ -116,8 +118,9 @@ class NodeServer():
                 logging.info('Fazendo download da musica: ' + self.parent.song_to_search)
                 num_seq, data = self.download(num_seq, self.parent.song_to_search, addr)
                 self.data = data
+                print('Esperando para proximo comando.')
+                time.sleep(3)
                 self.event.set()
-                time.sleep(0.3)
             elif self.search_song_op:
                 logging.info('Buscando musica: ' + self.parent.song_to_search + ' no seeder com IP: ' + str(addr[0]) + ':' + str(addr[1]))
                 header = self.header_request(num_seq+1, len(self.parent.song_to_search))
@@ -149,6 +152,8 @@ class Leecher():
         self.list_threads = []
         self.event = threading.Event()
         self.header_size = 24
+        self.RTT = 0.005
+        self.F = 0.01
 
         self.cli_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.cli_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

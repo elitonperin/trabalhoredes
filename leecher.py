@@ -1,21 +1,14 @@
-# Import socket module 
 import logging
-# import utils module
 import random
 import socket
 import struct
 import threading
 import time
-# import thread module
 from _thread import *
 from datetime import datetime
 
 import numpy
 
-
-# import audio module
-# import pyaudio
-# from pydub import AudioSegment
 
 class SeederInfo():
     def __init__(self, ip, port):
@@ -279,7 +272,7 @@ class Leecher():
         print('Mensagem recebida: ', packet.decode())
         self.cli_socket.close()
 
-    def do_download(self, size_data, n_seeders):
+    def do_download(self, size_data, n_seeders, file_name=None):
 
         if self.setup_update_table is not None:
             self.file_list.append('Downloading')
@@ -311,14 +304,15 @@ class Leecher():
             data = data + n.data
             n.download_req = False
 
-        fileName = str(datetime.now().hour) + "-novo-" + str(datetime.now().minute) + ".wav"
+        file_header_name = str(datetime.now().hour) + "-novo-" + str(datetime.now().minute)
+        file_name_downloaded = file_header_name + ".wav" if file_name is None else file_header_name + file_name
 
         if self.setup_update_table is not None:
             self.file_list.pop()
-            self.file_list.append('Downloading')
+            self.file_list.append(file_name_downloaded)
             self.setup_update_table(len(self.file_list))
 
-        f = open(fileName, "w+b")
+        f = open(file_name_downloaded, "w+b")
         f.write(data)
         f.close()
         pass
@@ -409,7 +403,7 @@ class Leecher():
             for n in self.list_threads:
                 if n.has_song:
                     n.download_req = True
-            self.do_download(info, count)
+            self.do_download(info, count, file_name)
         else:
             print('Arquivo nao encontrado')
 

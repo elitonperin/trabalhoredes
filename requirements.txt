@@ -1,5 +1,5 @@
 PyQt5
-numpy==1.16.3
+numpy==1.22.0
 PyAudio==0.2.11
 pydub==0.23.1
 pygame==1.9.6
